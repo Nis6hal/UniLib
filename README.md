@@ -1,176 +1,147 @@
-# 📚 UniLib — University Library Management System
+# UniLib — University Library Management System
 
-> A hands-on database learning project built around a real-world use case.
-
----
-
-## 🎯 Project Goal
-
-This project exists to make you *actually* learn databases by solving real problems — not just reading about them. Every feature you build will push you to write meaningful SQL, design proper schemas, handle edge cases, and think about data integrity.
-
-By the end, you won't just know what a foreign key is — you'll have felt the pain of not having one.
+A self-contained library management system for universities and small institutions. Built on Flask and SQLite, it runs with a single command and requires no external database or infrastructure setup.
 
 ---
 
-## 🗂️ Features to Build
+## Features
 
-### Core
-- [ ] Student & staff registration
-- [ ] Book catalog (add, update, remove books)
-- [ ] Borrow & return books
-- [ ] Track due dates and overdue items
-- [ ] Fine calculation for late returns
-- [ ] Search books by title, author, genre, ISBN
+### Catalog
+- Add, search, and delete books with per-copy tracking
+- Bulk import books from a CSV file (drag & drop)
+- Availability badges showing copies available vs. reserved vs. borrowed
 
-### Intermediate
-- [ ] Book reservation queue (what happens when a book is already borrowed?)
-- [ ] Multiple copies of the same book
-- [ ] Borrow history per student
-- [ ] Reports: most borrowed books, most active users
+### Members
+- Student, librarian, and admin roles
+- Per-member profile page with borrow history, active loans, fines, and favourite genre
+- Borrow slot indicator showing usage against the limit
 
-### Advanced
-- [ ] Role-based access (student vs librarian vs admin)
-- [ ] Book recommendations based on borrow history
-- [ ] Bulk import books via CSV
-- [ ] Audit log — who changed what and when
+### Circulation
+- **Borrow** — enforces a configurable per-member borrow limit (default 5)
+- **Return** — auto-calculates overdue fines ($0.50/day), triggers reservation holds
+- **Renew** — up to 2 renewals per borrow; blocked if pending reservations exist
+- **Overdue** — dedicated view with days-late badge and estimated fine
 
----
+### Reservations
+- Full queue lifecycle: `pending` → `ready` → `collected` / `cancelled` / `expired`
+- Copies are physically held for the next person in queue on return
+- Holds expire after 3 days; copy automatically passes to the next member in line
+- Availability-gated: can only reserve a book with zero available copies
 
-## 🧱 Suggested Database Schema
-
-Design your tables before writing any code. Start here and expand as needed.
-
-```
-users          — id, name, email, role, joined_at
-books          — id, isbn, title, author, genre, total_copies
-book_copies    — id, book_id, status (available/borrowed/reserved)
-borrows        — id, user_id, copy_id, borrowed_at, due_at, returned_at
-reservations   — id, user_id, book_id, reserved_at, status
-fines          — id, borrow_id, amount, paid, created_at
-```
-
-> ⚠️ Don't just copy this. Draw it out yourself first. Which fields should be NOT NULL? Where do foreign keys go? What happens if a user is deleted — should their borrow history disappear?
+### Fines & Admin
+- Fines auto-generated on overdue return, mark-as-paid workflow
+- Audit log for every borrow, return, renewal, reservation change
+- "Fix Stuck Copies" tool to heal any data inconsistencies
+- Light and dark mode, saves preference across sessions
+- Fully responsive — works on desktop, tablet, and mobile
 
 ---
 
-## 🏋️ Database Challenges (Do These, Don't Skip Them)
-
-These are the exercises that will teach you the most. Each one maps to a real feature.
-
-**Level 1 — Foundations**
-1. Create all tables with proper data types and constraints.
-2. Insert 10 students, 20 books, and 2 copies per book manually using `INSERT`.
-3. Query all available copies of a specific book using a `JOIN`.
-4. Find all books currently borrowed by a specific student.
-
-**Level 2 — Relationships & Constraints**
-5. What happens when you try to borrow a book that has 0 available copies? Enforce this with a `CHECK` constraint or a trigger.
-6. Write a query to find all overdue borrows (due_at < NOW() and returned_at IS NULL).
-7. Calculate the fine for each overdue borrow (e.g. $0.50/day). Do this in pure SQL first before writing any app logic.
-8. Write a query that returns the top 5 most borrowed books of all time.
-
-**Level 3 — Transactions & Integrity**
-9. Wrap a "borrow a book" operation in a transaction — it should update `book_copies.status` AND insert into `borrows` atomically. If one fails, both should roll back.
-10. Implement a reservation system: when a book is returned, automatically notify (or assign) the next person in the queue.
-11. Create an `audit_log` table and write a trigger that records every `UPDATE` to the `borrows` table.
-
-**Level 4 — Performance**
-12. Add indexes to columns you frequently filter or join on. Measure query time before and after with `EXPLAIN ANALYZE`.
-13. Write a view called `active_borrows` that simplifies complex joins for reporting.
-14. Identify one N+1 query problem in your code and fix it with a proper JOIN.
-
----
-
-## 🛠️ Tech Stack Suggestions
-
-You're free to use what you want, but here are sensible starting points:
-
-| Layer | Option A | Option B |
-|---|---|---|
-| Database | PostgreSQL | MySQL |
-| Backend | Python (Flask/FastAPI) | Node.js (Express) |
-| ORM (optional) | SQLAlchemy | Prisma |
-| Frontend (optional) | Plain HTML + JS | React |
-
-> 💡 **Recommendation:** Start with raw SQL — no ORM. The whole point is to learn the database layer. Add an ORM later if you want to compare the experience.
-
----
-
-## 🚀 Getting Started
+## Quick Start
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/yourusername/unilib.git
-cd unilib
+# 1. Install the only dependency
+pip install flask
 
-# 2. Set up your database
-# (Create a PostgreSQL or MySQL database named 'unilib')
+# 2. Run
+python app.py
 
-# 3. Run migrations
-psql -U youruser -d unilib -f schema.sql
+# 3. Open in your browser
+http://localhost:5000
+```
 
-# 4. Seed with sample data
-psql -U youruser -d unilib -f seed.sql
+The database (`unilib.db`) is created automatically on first run, pre-loaded with 12 members, 20 books, and sample borrow data so you can explore immediately.
 
-# 5. Start the app
-# (depends on your backend choice)
+---
+
+## CSV Import Format
+
+Go to **Books → Import CSV**. Required columns: `title`, `author`, `isbn`.  
+Optional: `genre`, `copies` (defaults to 1). Duplicate ISBNs are skipped automatically.
+
+```csv
+title,author,isbn,genre,copies
+The Pragmatic Programmer,David Thomas,978-0-13-595705-9,Technology,2
+Clean Code,Robert Martin,978-0-13-235088-4,Technology,1
+Dune,Frank Herbert,978-0-441-17271-9,Sci-Fi,3
 ```
 
 ---
 
-## 📁 Suggested Project Structure
+## Project Structure
 
 ```
 unilib/
-├── schema.sql          ← Your table definitions
-├── seed.sql            ← Sample data for testing
-├── queries/            ← Save your important SQL queries here
-│   ├── overdue.sql
-│   ├── top_books.sql
-│   └── ...
-├── src/                ← Application code
-│   ├── db.py           ← Database connection
-│   ├── models/
-│   └── routes/
-├── tests/
+├── app.py              ← Flask backend — all routes, business logic, DB migrations
+├── unilib.db           ← SQLite database (auto-created on first run)
+├── requirements.txt
+├── static/
+│   └── index.html      ← Complete single-page frontend (no build step)
 └── README.md
 ```
 
-> Save your SQL queries as `.sql` files. You'll want to look back at them.
+---
+
+## Configuration
+
+Constants at the top of `app.py`:
+
+| Constant | Default | Description |
+|----------|---------|-------------|
+| `MAX_BORROWS` | `5` | Max concurrent borrows per member |
+| `MAX_RENEWALS` | `2` | Max renewals per borrow |
+| `RENEWAL_DAYS` | `14` | Days added per renewal |
+| `FINE_PER_DAY` | `0.50` | Overdue fine per day ($) |
+| `HOLD_TTL_DAYS` | `3` | Days a reservation hold stays active before expiring |
 
 ---
 
-## 📖 What You'll Learn
+## API Reference
 
-If you complete this project fully, you will have practical experience with:
-
-- Schema design and normalization
-- Primary keys, foreign keys, and constraints
-- `JOIN`, `GROUP BY`, `HAVING`, subqueries, and CTEs
-- Transactions and ACID properties
-- Triggers and stored procedures
-- Indexes and query optimization with `EXPLAIN`
-- Handling real-world data integrity problems
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/stats` | Dashboard statistics |
+| GET / POST | `/api/books` | List books / add a book |
+| DELETE | `/api/books/:id` | Delete a book (blocked if actively borrowed) |
+| GET / POST | `/api/users` | List members / add a member |
+| DELETE | `/api/users/:id` | Remove a member |
+| GET | `/api/users/:id/profile` | Full member profile |
+| GET / POST | `/api/borrows` | List borrows / issue a borrow |
+| POST | `/api/borrows/:id/return` | Return a book |
+| POST | `/api/borrows/:id/renew` | Renew a borrow |
+| GET / POST | `/api/reservations` | List reservations / create one |
+| POST | `/api/reservations/:id/collect` | Member collects a ready hold |
+| POST | `/api/reservations/:id/cancel` | Cancel a reservation |
+| POST | `/api/reservations/expire` | Expire stale holds (cron-friendly) |
+| GET | `/api/fines` | List all fines |
+| POST | `/api/fines/:id/pay` | Mark a fine as paid |
+| GET | `/api/audit` | Last 50 audit log entries |
+| POST | `/api/admin/heal` | Release copies stuck in reserved state |
 
 ---
 
-## 📌 Learning Resources
+## Database Schema
 
-- [PostgreSQL Official Docs](https://www.postgresql.org/docs/) — your best friend
-- [SQLBolt](https://sqlbolt.com/) — interactive SQL exercises
-- [Use The Index, Luke](https://use-the-index-luke.com/) — for when you get to indexing
-- [DB Fiddle](https://www.db-fiddle.com/) — test queries in the browser
+```
+users         — id, name, email, role, joined_at
+books         — id, isbn, title, author, genre, total_copies, cover_color
+book_copies   — id, book_id, status (available / borrowed / reserved)
+borrows       — id, user_id, copy_id, borrowed_at, due_at, returned_at, renewals
+reservations  — id, user_id, book_id, copy_id, reserved_at, hold_expires_at, status
+fines         — id, borrow_id, amount, paid, created_at
+audit_log     — id, table_name, record_id, action, changed_by, changed_at, details
+```
 
 ---
 
-## 🗒️ Notes
+## Tech Stack
 
-Keep a `NOTES.md` or a dev journal as you go. Write down:
-- Problems you hit and how you solved them
-- SQL queries that took you a long time to figure out
-- Design decisions you made and why
-
-You'll be glad you did when you're reviewing this project months later.
+| Layer | Technology |
+|-------|-----------|
+| Backend | Python 3 + Flask |
+| Database | SQLite (via built-in `sqlite3`) |
+| Frontend | Vanilla HTML / CSS / JS — no build step, no frameworks |
+| Fonts | Playfair Display + DM Sans (Google Fonts) |
 
 ---
 
