@@ -118,11 +118,27 @@ fines          — id, borrow_id, amount, paid, created_at
 audit_log      — id, table_name, record_id, action, details, changed_at
 ```
 
+## Configuration & Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `5000` | Port for the Flask backend API server |
+| `HOST` | `0.0.0.0` | Host IP binding address |
+| `DEBUG` | `true` | Enable Flask debug mode & auto-reloading |
+| `MAX_BORROWS` | `5` | Maximum active books per member |
+| `MAX_RENEWALS` | `2` | Maximum renewal count per loan |
+| `RENEWAL_DAYS` | `14` | Loan extension period in days |
+| `FINE_PER_DAY` | `0.50` | Daily fine accumulation rate ($) |
+| `HOLD_TTL_DAYS`| `3` | Number of days a ready reservation hold is reserved |
+
 ## Tech Stack
 
 - **Frontend**: React 19 + Vite
-- **Backend**: Python / Flask
+- **Backend**: Python 3.8+ / Flask
 - **Database**: SQLite (via built-in `sqlite3`)
-- **Fonts**: Playfair Display + DM Sans (Google Fonts)
+- **Typography**: Playfair Display + DM Sans (Google Fonts)
+
+---
 
 *Built to learn. Break things. Fix them. Repeat.*
+
