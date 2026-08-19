@@ -31,6 +31,13 @@ export default function Layout({ activeTab, onTabChange, children }) {
             </li>
           ))}
         </ul>
+        <div className="sidebar-footer" style={{ marginTop: 'auto', padding: '1rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)', fontSize: '0.8rem', color: '#94a3b8' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }}></span>
+            <span>API Online</span>
+          </div>
+          <span style={{ opacity: 0.6 }}>UniLib v1.0.0</span>
+        </div>
       </nav>
       <main className="main-content">{children}</main>
     </div>
