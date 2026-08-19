@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, send_from_directory, g
 
-app = Flask(__name__, static_folder='static')
+app = Flask(__name__, static_folder='client/dist', static_url_path='')
 DB_PATH = os.path.join(os.path.dirname(__file__), 'unilib.db')
 
 MAX_BORROWS   = 5
@@ -284,7 +284,7 @@ def add_cors(r):
 @app.route('/<path:path>')
 def catch_all(path):
     if path.startswith('api/'): return jsonify({"error": "Not found"}), 404
-    return send_from_directory('static', 'index.html')
+    return send_from_directory(app.static_folder, 'index.html')
 
 # ── Users ─────────────────────────────────────────────────────────────────────
 
@@ -801,9 +801,29 @@ def heal_copies():
         db.commit()
     return jsonify({"ok": True, "copies_released": fixed})
 
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Service health check endpoint with database connectivity status."""
+    try:
+        db = get_db()
+        db.execute("SELECT 1").fetchone()
+        db_status = "connected"
+    except Exception as err:
+        db_status = f"error: {str(err)}"
+
+    return jsonify({
+        "status": "healthy" if db_status == "connected" else "degraded",
+        "timestamp": datetime.now().isoformat(),
+        "database": db_status,
+        "version": "1.0.0"
+    })
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
     init_db()
     seed_db()
-    app.run(debug=True, port=5000)
+    host = os.environ.get('HOST', '0.0.0.0')
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('DEBUG', 'true').lower() in ('true', '1', 'yes')
+    app.run(host=host, port=port, debug=debug)
