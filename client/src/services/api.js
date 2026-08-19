@@ -18,6 +18,7 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  getHealth: () => request('/health'),
   getBooks: (search) => {
     const q = search ? `?q=${encodeURIComponent(search)}` : '';
     return request(`/books${q}`);
@@ -31,7 +32,7 @@ export const api = {
   getMemberProfile: (id) => request(`/users/${id}/profile`),
 
   getBorrows: (params) => {
-    const qs = new URLSearchParams(params).toString();
+    const qs = params ? new URLSearchParams(params).toString() : '';
     return request(`/borrows${qs ? `?${qs}` : ''}`);
   },
   borrowBook: (data) => request('/borrows', { method: 'POST', body: data }),
