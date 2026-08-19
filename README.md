@@ -1,44 +1,85 @@
-# UniLib — University Library Management System
+# 📚 UniLib — University Library Management System
 
-A fully deployable library management system built with Python (Flask) + SQLite.  
-No external database needed — just Python and Flask.
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
+[![Flask](https://img.shields.io/badge/Flask-3.x-black?style=flat-square&logo=flask)](https://flask.palletsprojects.com/)
+[![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+[![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
 
-## Features
+A modern, production-grade library management system built with **React (Vite)** frontend, **Python Flask** REST API backend, and lightweight **SQLite** storage.
+No external database setup required — get running in seconds.
 
-- **Book Catalog** — Add, search, delete books with copy tracking
-- **Member Management** — Students, librarians, admins
-- **Borrow & Return** — Atomic transactions, prevents over-borrowing
-- **Overdue Tracking** — Automatic detection, $0.50/day fine calculation
-- **Fine Management** — Auto-generated on return, mark-as-paid workflow
-- **Reservation Queue** — Reserve unavailable books; auto-fulfilled on return
-- **Audit Log** — Every borrow/return is logged with details
-- **Dashboard** — Stats, top books chart, recent activity
+## ✨ Key Features
+
+- **Book Catalog** — Add, search, filter, and delete books with multi-copy tracking
+- **Member Management** — Students, librarians, and admins with detailed profile views
+- **Borrow & Return** — Safe transactions with concurrency protection; prevents over-borrowing
+- **Overdue Tracking** — Automatic overdue detection with configurable daily fine calculations
+- **Fine Management** — Auto-generated fine records on return with one-click payment settlement
+- **Reservation Queue** — Reserve currently unavailable books; automatically assigned on return
+- **Audit Logging** — Every borrow, return, fine payment, and status mutation is recorded
+- **Live Dashboard** — Real-time metrics, circulation stats, top books, and activity stream
+- **System Health Checks** — Built-in `/api/health` monitoring for uptime and DB connection status
 
 ## Quick Start
 
-```bash
-# 1. Install dependencies (only Flask needed)
-pip install flask
+### Development Mode (React + Flask separately)
 
-# 2. Run the app
+```bash
+# Terminal 1 — Start Flask API
+pip install flask
 python app.py
 
-# 3. Open in browser
-http://localhost:5000
+# Terminal 2 — Start React dev server
+cd client
+npm install
+npm run dev
 ```
 
-The database (`unilib.db`) is created automatically on first run,  
+Open http://localhost:3000 — the Vite dev server proxies `/api` requests to Flask on port 5000.
+
+### Production Mode (Flask serves React build)
+
+```bash
+# Build the React app
+cd client
+npm run build
+
+# Start Flask (serves both API and React build)
+pip install flask
+python app.py
+```
+
+Open http://localhost:5000.
+
+The database (`unilib.db`) is created automatically on first run,
 along with 12 members, 20 books, and some sample borrow history.
 
 ## Project Structure
 
 ```
 unilib/
-├── app.py              ← Flask app + all API routes
-├── unilib.db           ← SQLite database (auto-created)
+├── app.py                  ← Flask app + all API routes
+├── unilib.db               ← SQLite database (auto-created)
 ├── requirements.txt
-├── static/
-│   └── index.html      ← Full single-page frontend
+├── client/                 ← React frontend
+│   ├── package.json
+│   ├── vite.config.js
+│   ├── index.html
+│   └── src/
+│       ├── main.jsx        ← React entry point
+│       ├── App.jsx         ← Main app with tab navigation
+│       ├── App.css         ← Global styles
+│       ├── services/api.js ← API client
+│       └── components/
+│           ├── Layout.jsx      ← Sidebar layout
+│           ├── Dashboard.jsx   ← Stats dashboard
+│           ├── BookList.jsx    ← Book catalog management
+│           ├── MemberList.jsx  ← Member records
+│           ├── BorrowForm.jsx  ← Issue / return / renew
+│           ├── ReservationList.jsx ← Reservation queue
+│           ├── FineList.jsx    ← Fine management
+│           └── AuditLog.jsx    ← Audit log viewer
 └── README.md
 ```
 
@@ -46,17 +87,24 @@ unilib/
 
 | Method | Path | Description |
 |--------|------|-------------|
+| GET | /api/health | Service & database health status |
 | GET | /api/stats | Dashboard statistics |
 | GET/POST | /api/books | List/add books |
 | DELETE | /api/books/:id | Delete a book |
 | GET/POST | /api/users | List/add members |
 | DELETE | /api/users/:id | Remove a member |
+| GET | /api/users/:id/profile | Member profile with active borrows, reservations, fines |
 | GET/POST | /api/borrows | List/create borrows |
 | POST | /api/borrows/:id/return | Return a book |
+| POST | /api/borrows/:id/renew | Renew a borrow |
 | GET/POST | /api/reservations | List/create reservations |
+| POST | /api/reservations/:id/collect | Collect a ready hold |
+| POST | /api/reservations/:id/cancel | Cancel a reservation |
+| POST | /api/reservations/expire | Expire ready holds past TTL |
 | GET | /api/fines | List all fines |
 | POST | /api/fines/:id/pay | Mark fine as paid |
 | GET | /api/audit | Audit log |
+| POST | /api/admin/heal | Release orphaned reserved copies |
 
 ## Database Schema
 
@@ -64,17 +112,17 @@ unilib/
 users          — id, name, email, role, joined_at
 books          — id, isbn, title, author, genre, total_copies, cover_color
 book_copies    — id, book_id, status (available/borrowed/reserved)
-borrows        — id, user_id, copy_id, borrowed_at, due_at, returned_at
-reservations   — id, user_id, book_id, reserved_at, status
+borrows        — id, user_id, copy_id, borrowed_at, due_at, returned_at, renewals
+reservations   — id, user_id, book_id, copy_id, reserved_at, hold_expires_at, status
 fines          — id, borrow_id, amount, paid, created_at
 audit_log      — id, table_name, record_id, action, details, changed_at
 ```
 
 ## Tech Stack
 
+- **Frontend**: React 19 + Vite
 - **Backend**: Python / Flask
 - **Database**: SQLite (via built-in `sqlite3`)
-- **Frontend**: Vanilla HTML/CSS/JS (no build step, no frameworks)
 - **Fonts**: Playfair Display + DM Sans (Google Fonts)
 
 *Built to learn. Break things. Fix them. Repeat.*
