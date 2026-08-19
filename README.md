@@ -52,10 +52,25 @@ python app.py
 
 Open http://localhost:5000.
 
-The database (`unilib.db`) is created automatically on first run,
-along with 12 members, 20 books, and some sample borrow history.
+## 🏗️ Architecture Overview
+
+```mermaid
+graph TD
+    Client[React 19 Frontend / SPA] -->|HTTP REST Requests /api/*| Flask[Flask Backend API]
+    Flask -->|PRAGMA foreign_keys = ON| SQLite[(SQLite Database unilib.db)]
+    Flask -->|Serve Compiled SPA| Dist[client/dist Static Assets]
+    subgraph Core Features
+        Flask --> Auth[Member Directory]
+        Flask --> Catalog[Book & Copy Inventory]
+        Flask --> Circulation[Borrow & Return Engine]
+        Flask --> Queue[Reservation Hold Queue]
+        Flask --> Fines[Overdue Fine Processor]
+        Flask --> Audit[Immutable Audit Logger]
+    end
+```
 
 ## Project Structure
+
 
 ```
 unilib/
