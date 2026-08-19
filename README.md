@@ -153,7 +153,40 @@ audit_log      — id, table_name, record_id, action, details, changed_at
 - **Database**: SQLite (via built-in `sqlite3`)
 - **Typography**: Playfair Display + DM Sans (Google Fonts)
 
+## 🛠️ Troubleshooting & FAQ
+
+<details>
+<summary><b>Q: How do I reset the sample data in the database?</b></summary>
+
+Simply stop the server, delete `unilib.db`, and start `app.py` again. A fresh database with default books, members, and sample circulation records will be created automatically on startup.
+</details>
+
+<details>
+<summary><b>Q: How can I change the maximum number of borrowed books per user?</b></summary>
+
+Edit the `MAX_BORROWS` constant in `app.py` or set it before initialization. The default limit is 5 books per member.
+</details>
+
+<details>
+<summary><b>Q: How are reservation holds expired?</b></summary>
+
+The backend checks reservation timestamps against `HOLD_TTL_DAYS`. You can trigger the cleanup anytime via `POST /api/reservations/expire` or use the Admin panel.
+</details>
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
 ---
 
 *Built to learn. Break things. Fix them. Repeat.*
+
 
