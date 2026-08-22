@@ -116,59 +116,57 @@ export default function LandingPage({ onOpenAuth }) {
           </a>
         </div>
 
-        {/* Hero Real Academic Photography Showcase */}
-        <div style={{
-          position: 'relative',
-          width: '100%',
-          maxWidth: 920,
-          margin: '36px auto 20px',
-          borderRadius: 'var(--radius-xl)',
-          overflow: 'hidden',
-          border: '1px solid var(--border)',
-          boxShadow: '0 25px 60px rgba(0,0,0,0.8), 0 0 40px rgba(212,175,55,0.15)',
-        }} className="animate-in">
-          <img
-            src="https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1400&auto=format&fit=crop&q=80"
-            alt="University Library Reading Hall"
-            style={{
-              width: '100%',
-              height: 360,
-              objectFit: 'cover',
-              filter: 'brightness(0.78) contrast(1.1)',
-              display: 'block'
-            }}
-          />
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'linear-gradient(180deg, rgba(10,12,16,0.2) 0%, rgba(10,12,16,0.85) 100%)',
-            display: 'flex',
-            alignItems: 'flex-end',
-            padding: '24px 28px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', width: '100%', flexWrap: 'wrap', gap: 16 }}>
-              <div>
-                <span className="badge-mini" style={{ marginBottom: 6 }}>Central Academic Repository</span>
-                <h3 style={{ fontSize: '1.35rem', fontFamily: 'var(--font-display)', color: '#fff', margin: 0 }}>
-                  Connecting Physical Stacks with Global Digital Research
-                </h3>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
-                  Over 12,000 physical volumes, 45,000 digital papers, and personal student notes.
-                </p>
-              </div>
+        {/* Real-Image 3D Floating Hardcover Book & Orbiting Badges */}
+        <div className="real-3d-book-container animate-in">
+          <div className="hero-glow-halo" />
 
-              <div style={{ display: 'flex', gap: 8 }}>
-                <span className="badge badge-info" style={{ backdropFilter: 'blur(10px)', background: 'rgba(56,189,248,0.2)' }}>
-                  100% Real-Time
-                </span>
-                <span className="badge badge-success" style={{ backdropFilter: 'blur(10px)', background: 'rgba(16,185,129,0.2)' }}>
-                  Campus Online
-                </span>
+          {/* Orbiting Metadata Badges */}
+          <div className="orbiting-card card-1">
+            <BookOpen size={16} color="var(--primary)" /> Physical Stock: 12,000+ Volumes
+          </div>
+          <div className="orbiting-card card-2">
+            <FileCode size={16} color="var(--info)" /> Research DOI & Theses Repository
+          </div>
+          <div className="orbiting-card card-3">
+            <FolderUp size={16} color="var(--success)" /> Personal Study Vault & Folders
+          </div>
+          <div className="orbiting-card card-4">
+            <Bot size={16} color="var(--warning)" /> AI-Grounded Document Assistant
+          </div>
+
+          {/* Realistic 3D Book */}
+          <div className="real-3d-book" onClick={() => onOpenAuth('register')}>
+            {/* Front Cover with Real High-Res Photography Artwork */}
+            <div className="book-front-cover">
+              <img
+                src="https://images.unsplash.com/photo-1532012164546-f432f2e3dd44?w=800&auto=format&fit=crop&q=80"
+                alt="Artificial Intelligence: A Modern Approach"
+              />
+              <div className="book-spine-sheen" />
+              <div className="book-cover-foil-overlay">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span className="badge-mini">Academic Vol. 2026</span>
+                  <Sparkles size={13} color="var(--primary)" />
+                </div>
+                <h3 style={{ fontSize: '1.05rem', fontFamily: 'var(--font-display)', color: '#fff', margin: '4px 0 2px' }}>
+                  Artificial Intelligence
+                </h3>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  Russell & Norvig • 4th Edition
+                </p>
+                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 600 }}>Physical & Digital</span>
+                  <span className="badge badge-success" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>Available</span>
+                </div>
               </div>
             </div>
+
+            {/* Realistic 3D Paper Edges */}
+            <div className="book-side-pages" />
+            <div className="book-bottom-pages" />
+
+            {/* Back Hardcover */}
+            <div className="book-back-cover" />
           </div>
         </div>
 
