@@ -2,10 +2,13 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.env
 *.env
 .venv/
 env/
 venv/
+uploads/
+*.db
 
 # Node / Frontend
 node_modules/

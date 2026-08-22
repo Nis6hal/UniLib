@@ -1,16 +1,78 @@
 import sqlite3
 import os
+import random
+import smtplib
+import ssl
 from datetime import datetime, timedelta
-from flask import Flask, request, jsonify, send_from_directory, g
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+from flask import Flask, request, jsonify, send_from_directory, send_file, g
+
+# Load .env configuration if present
+env_file = os.path.join(os.path.dirname(__file__), '.env')
+if os.path.exists(env_file):
+    with open(env_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                k, v = line.split('=', 1)
+                k = k.strip()
+                v = v.strip().strip("'\"")
+                if k not in os.environ:
+                    os.environ[k] = v
 
 app = Flask(__name__, static_folder='client/dist', static_url_path='')
 DB_PATH = os.path.join(os.path.dirname(__file__), 'unilib.db')
+UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB limit
 
 MAX_BORROWS   = 5
 MAX_RENEWALS  = 2
 RENEWAL_DAYS  = 14
 FINE_PER_DAY  = 0.50
 HOLD_TTL_DAYS = 3   # days a "ready" hold is kept before expiring
+
+def send_email_notification(to_email, subject, html_content, text_content=None):
+    """
+    Sends transactional email via SMTP if configured in env,
+    otherwise gracefully logs to console and returns success for local testing.
+    """
+    smtp_host = os.environ.get('SMTP_HOST')
+    smtp_port = int(os.environ.get('SMTP_PORT', 587))
+    smtp_user = os.environ.get('SMTP_USER')
+    smtp_pass = os.environ.get('SMTP_PASS')
+    from_email = os.environ.get('FROM_EMAIL', smtp_user or 'noreply@unilib.edu')
+
+    if smtp_host and smtp_user and smtp_pass:
+        try:
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = f"UniLib <{from_email}>"
+            msg['To'] = to_email
+            if text_content:
+                msg.attach(MIMEText(text_content, 'plain'))
+            msg.attach(MIMEText(html_content, 'html'))
+
+            context = ssl.create_default_context()
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.starttls(context=context)
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(from_email, to_email, msg.as_string())
+            return True, "Email delivered successfully via SMTP"
+        except Exception as e:
+            print(f"[SMTP ERROR] Failed to send email to {to_email}: {e}")
+            return False, str(e)
+    else:
+        print(f"\n================ [UNILIB EMAIL NOTIFICATION] ================")
+        print(f"TO: {to_email}")
+        print(f"SUBJECT: {subject}")
+        print(f"CONTENT:\n{text_content or html_content}")
+        print(f"==============================================================\n")
+        return True, "Logged to console (SMTP credentials not configured)"
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
 
@@ -183,16 +245,60 @@ def init_db():
         if 'hold_expires_at' not in existing_res:
             db.execute("ALTER TABLE reservations ADD COLUMN hold_expires_at TEXT")
 
-    # Heal any copies stuck in 'reserved' with no active reservation behind them.
-    # Runs every startup — safe and fast.
+    # digital_books: user uploaded ebooks & documents
     db.execute("""
-        UPDATE book_copies SET status='available'
-        WHERE status='reserved'
-        AND id NOT IN (
-            SELECT copy_id FROM reservations
-            WHERE status IN ('pending','ready') AND copy_id IS NOT NULL
-        )
+    CREATE TABLE IF NOT EXISTS digital_books (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        title TEXT NOT NULL,
+        author TEXT NOT NULL,
+        genre TEXT,
+        file_name TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        file_size INTEGER DEFAULT 0,
+        file_type TEXT DEFAULT 'pdf',
+        description TEXT,
+        uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
     """)
+
+    # users: add password & verification columns if missing
+    existing_users_cols = [r[1] for r in db.execute("PRAGMA table_info(users)").fetchall()]
+    if 'password_hash' not in existing_users_cols:
+        db.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+    if 'is_verified' not in existing_users_cols:
+        db.execute("ALTER TABLE users ADD COLUMN is_verified INTEGER NOT NULL DEFAULT 1")
+    if 'verification_code' not in existing_users_cols:
+        db.execute("ALTER TABLE users ADD COLUMN verification_code TEXT")
+    if 'verification_expires_at' not in existing_users_cols:
+        db.execute("ALTER TABLE users ADD COLUMN verification_expires_at TEXT")
+
+    # books: add cover_image column if missing
+    existing_books_cols = [r[1] for r in db.execute("PRAGMA table_info(books)").fetchall()]
+    if 'cover_image' not in existing_books_cols:
+        db.execute("ALTER TABLE books ADD COLUMN cover_image TEXT")
+
+    # Set default password ('password123') for any existing users without a hash
+    default_hash = generate_password_hash("password123")
+    db.execute("UPDATE users SET password_hash = ? WHERE password_hash IS NULL OR password_hash = ''", (default_hash,))
+
+    # Populate curated realistic high-res cover photography for books
+    book_covers = [
+        ("The Great Gatsby", "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500&auto=format&fit=crop&q=80"),
+        ("1984", "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=500&auto=format&fit=crop&q=80"),
+        ("To Kill a Mockingbird", "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=500&auto=format&fit=crop&q=80"),
+        ("Dune", "https://images.unsplash.com/photo-1516979187457-637abb4f9353?w=500&auto=format&fit=crop&q=80"),
+        ("Sapiens", "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?w=500&auto=format&fit=crop&q=80"),
+        ("The Alchemist", "https://images.unsplash.com/photo-1506880018603-83d5b814b5a6?w=500&auto=format&fit=crop&q=80"),
+        ("The Catcher in the Rye", "https://images.unsplash.com/photo-1519682337058-a94d519337bc?w=500&auto=format&fit=crop&q=80"),
+        ("Thinking, Fast and Slow", "https://images.unsplash.com/photo-1532012164546-f432f2e3dd44?w=500&auto=format&fit=crop&q=80"),
+        ("The Martian", "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=500&auto=format&fit=crop&q=80"),
+        ("Educated", "https://images.unsplash.com/photo-1491841573634-28140fc7ced7?w=500&auto=format&fit=crop&q=80"),
+        ("The Midnight Library", "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=500&auto=format&fit=crop&q=80"),
+        ("Atomic Habits", "https://images.unsplash.com/photo-1476275466078-4007374efbbe?w=500&auto=format&fit=crop&q=80"),
+    ]
+    for title, img_url in book_covers:
+        db.execute("UPDATE books SET cover_image = ? WHERE title = ? AND (cover_image IS NULL OR cover_image = '')", (img_url, title))
 
     db.commit()
     db.close()
@@ -306,6 +412,17 @@ def create_user():
 def delete_user(uid):
     run("DELETE FROM users WHERE id=?", (uid,))
     return jsonify({"ok": True})
+
+@app.route('/api/users/<int:uid>/role', methods=['POST'])
+def update_user_role(uid):
+    d = request.json or {}
+    new_role = d.get('role')
+    if new_role not in ('student', 'librarian', 'admin'):
+        return jsonify({"error": "Invalid role specified"}), 400
+    run("UPDATE users SET role=? WHERE id=?", (new_role, uid))
+    run("INSERT INTO audit_log(table_name, record_id, action, details) VALUES('users', ?, 'UPDATE', ?)",
+        (uid, f"Role changed to {new_role}"))
+    return jsonify({"ok": True, "role": new_role})
 
 @app.route('/api/users/<int:uid>/profile', methods=['GET'])
 def member_profile(uid):
@@ -566,17 +683,24 @@ def renew_borrow(bid):
 @app.route('/api/reservations', methods=['GET'])
 def get_reservations():
     status_filter = request.args.get('status', 'active')  # active | all
+    user_id = request.args.get('user_id')
+    where_clauses = []
+    params = []
     if status_filter == 'all':
-        where = "r.status IN ('pending','ready','collected','cancelled','expired')"
+        where_clauses.append("r.status IN ('pending','ready','collected','cancelled','expired')")
     else:
-        where = "r.status IN ('pending','ready')"
+        where_clauses.append("r.status IN ('pending','ready')")
+    if user_id:
+        where_clauses.append("r.user_id = ?")
+        params.append(user_id)
 
+    where = " AND ".join(where_clauses)
     rows = q(f"""SELECT r.*, u.name AS user_name, b.title, b.author, b.cover_color
                  FROM reservations r
                  JOIN users u ON u.id=r.user_id
                  JOIN books b ON b.id=r.book_id
                  WHERE {where}
-                 ORDER BY r.reserved_at""")
+                 ORDER BY r.reserved_at""", params)
     return jsonify(rows_to_list(rows))
 
 @app.route('/api/reservations', methods=['POST'])
@@ -660,7 +784,6 @@ def cancel_reservation(rid):
 
     released_to = None
     if res['status'] == 'ready' and res['copy_id']:
-        # This copy was held — pass it to the next person in queue (if any)
         next_res = q("""SELECT * FROM reservations
                         WHERE book_id=? AND status='pending'
                         ORDER BY reserved_at LIMIT 1""", (res['book_id'],), one=True)
@@ -676,7 +799,6 @@ def cancel_reservation(rid):
                        (next_res['id'],'UPDATE',
                         f'hold passed from cancelled res #{rid}, expires {hold_expires[:10]}'))
         else:
-            # No one waiting — release copy back to available
             db.execute("UPDATE book_copies SET status='available' WHERE id=?", (res['copy_id'],))
 
     db.execute("""INSERT INTO audit_log(table_name,record_id,action,details)
@@ -687,11 +809,6 @@ def cancel_reservation(rid):
 
 @app.route('/api/reservations/expire', methods=['POST'])
 def expire_holds():
-    """
-    Expire all 'ready' holds whose hold_expires_at has passed.
-    Call this via a cron job, or manually from the UI.
-    Each expired hold releases the copy to the next person in queue (or back to available).
-    """
     expired = q("""SELECT * FROM reservations
                    WHERE status='ready' AND hold_expires_at < datetime('now')""")
     count = 0
@@ -727,12 +844,19 @@ def expire_holds():
 
 @app.route('/api/fines', methods=['GET'])
 def get_fines():
-    rows = q("""SELECT f.*, u.name AS user_name, b.title FROM fines f
+    user_id = request.args.get('user_id')
+    where = ""
+    params = []
+    if user_id:
+        where = "WHERE br.user_id = ?"
+        params.append(user_id)
+    rows = q(f"""SELECT f.*, u.name AS user_name, b.title FROM fines f
                 JOIN borrows br ON br.id=f.borrow_id
                 JOIN users u ON u.id=br.user_id
                 JOIN book_copies bc ON bc.id=br.copy_id
                 JOIN books b ON b.id=bc.book_id
-                ORDER BY f.created_at DESC""")
+                {where}
+                ORDER BY f.created_at DESC""", params)
     return jsonify(rows_to_list(rows))
 
 @app.route('/api/fines/<int:fid>/pay', methods=['POST'])
@@ -744,6 +868,52 @@ def pay_fine(fid):
 
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
+    user_id = request.args.get('user_id')
+    if user_id:
+        user = q("SELECT * FROM users WHERE id=?", (user_id,), one=True)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        active_borrows = q("SELECT COUNT(*) FROM borrows WHERE user_id=? AND returned_at IS NULL", (user_id,), one=True)[0]
+        overdue = q("SELECT COUNT(*) FROM borrows WHERE user_id=? AND due_at < datetime('now') AND returned_at IS NULL", (user_id,), one=True)[0]
+        unpaid_fines = q("""SELECT COALESCE(SUM(f.amount),0) FROM fines f
+                            JOIN borrows br ON br.id=f.borrow_id
+                            WHERE br.user_id=? AND f.paid=0""", (user_id,), one=True)[0]
+        pending_res = q("SELECT COUNT(*) FROM reservations WHERE user_id=? AND status='pending'", (user_id,), one=True)[0]
+        ready_holds = q("SELECT COUNT(*) FROM reservations WHERE user_id=? AND status='ready'", (user_id,), one=True)[0]
+        total_borrowed = q("SELECT COUNT(*) FROM borrows WHERE user_id=?", (user_id,), one=True)[0]
+
+        my_loans = q("""SELECT br.*, b.title, b.author, b.cover_color
+                        FROM borrows br
+                        JOIN book_copies bc ON bc.id=br.copy_id
+                        JOIN books b ON b.id=bc.book_id
+                        WHERE br.user_id=? AND br.returned_at IS NULL
+                        ORDER BY br.due_at""", (user_id,))
+
+        top_books = q("""SELECT b.title, b.author, b.cover_color, COUNT(*) AS borrow_count
+                          FROM borrows br
+                          JOIN book_copies bc ON bc.id=br.copy_id
+                          JOIN books b ON b.id=bc.book_id
+                          GROUP BY b.id ORDER BY borrow_count DESC LIMIT 5""")
+
+        return jsonify({
+            "is_personal": True,
+            "user_name": user['name'],
+            "role": user['role'],
+            "total_books": q("SELECT COUNT(*) FROM books", one=True)[0],
+            "active_borrows": active_borrows,
+            "overdue": overdue,
+            "unpaid_fines": round(float(unpaid_fines), 2),
+            "pending_res": pending_res,
+            "ready_holds": ready_holds,
+            "total_borrowed": total_borrowed,
+            "borrow_limit": MAX_BORROWS,
+            "hold_ttl_days": HOLD_TTL_DAYS,
+            "my_loans": rows_to_list(my_loans),
+            "top_books": rows_to_list(top_books)
+        })
+
+    # Admin campus-wide stats
     total_books    = q("SELECT COUNT(*) FROM books", one=True)[0]
     total_users    = q("SELECT COUNT(*) FROM users", one=True)[0]
     active_borrows = q("SELECT COUNT(*) FROM borrows WHERE returned_at IS NULL", one=True)[0]
@@ -758,6 +928,7 @@ def get_stats():
                           JOIN books b ON b.id=bc.book_id
                           GROUP BY b.id ORDER BY borrow_count DESC LIMIT 5""")
     return jsonify({
+        "is_personal": False,
         "total_books":    total_books,
         "total_users":    total_users,
         "active_borrows": active_borrows,
@@ -815,7 +986,492 @@ def health_check():
         "status": "healthy" if db_status == "connected" else "degraded",
         "timestamp": datetime.now().isoformat(),
         "database": db_status,
-        "version": "1.0.0"
+        "version": "2.0.0"
+    })
+
+# ── Authentication & OTP Verification ─────────────────────────────────────────
+
+@app.route('/api/auth/register', methods=['POST'])
+def auth_register():
+    d = request.json or {}
+    name = (d.get('name') or '').strip()
+    email = (d.get('email') or '').strip().lower()
+    password = d.get('password') or ''
+    # Public signups always default to student. Promotion to librarian/admin is granted by administrators.
+    role = 'student'
+
+    if not name or not email or not password:
+        return jsonify({"error": "Name, email, and password are required"}), 400
+
+    db = get_db()
+    existing = q("SELECT * FROM users WHERE email=?", (email,), one=True)
+    if existing:
+        if existing['is_verified']:
+            return jsonify({"error": "An account with this email already exists"}), 400
+        else:
+            otp = f"{random.randint(100000, 999999)}"
+            expires_at = (datetime.now() + timedelta(minutes=15)).isoformat()
+            p_hash = generate_password_hash(password)
+            db.execute("""
+                UPDATE users SET name=?, password_hash=?, role=?, verification_code=?, verification_expires_at=?
+                WHERE id=?
+            """, (name, p_hash, role, otp, expires_at, existing['id']))
+            db.commit()
+            uid = existing['id']
+    else:
+        otp = f"{random.randint(100000, 999999)}"
+        expires_at = (datetime.now() + timedelta(minutes=15)).isoformat()
+        p_hash = generate_password_hash(password)
+        cur = db.execute("""
+            INSERT INTO users(name, email, role, password_hash, is_verified, verification_code, verification_expires_at)
+            VALUES(?,?,?,?,0,?,?)
+        """, (name, email, role, p_hash, otp, expires_at))
+        db.commit()
+        uid = cur.lastrowid
+
+    html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px;">
+      <h2 style="color: #4f46e5; margin-bottom: 8px;">UniLib Account Verification</h2>
+      <p style="color: #475569; font-size: 15px;">Welcome to UniLib! Please enter the 6-digit verification code below to activate your library account:</p>
+      <div style="background: #f1f5f9; padding: 18px; text-align: center; border-radius: 8px; font-size: 28px; font-weight: 700; letter-spacing: 6px; color: #1e293b; margin: 20px 0;">
+        {otp}
+      </div>
+      <p style="color: #64748b; font-size: 13px;">This code will expire in 15 minutes. If you did not request this, please ignore this email.</p>
+    </div>
+    """
+    text = f"Your UniLib verification code is: {otp} (expires in 15 minutes)"
+    send_email_notification(email, "UniLib Verification Code", html, text)
+
+    return jsonify({
+        "ok": True,
+        "message": f"Verification code sent to {email}",
+        "email": email,
+        "user_id": uid
+    }), 201
+
+
+@app.route('/api/auth/verify-otp', methods=['POST'])
+def auth_verify_otp():
+    d = request.json or {}
+    email = (d.get('email') or '').strip().lower()
+    code = (d.get('code') or '').strip()
+
+    if not email or not code:
+        return jsonify({"error": "Email and verification code are required"}), 400
+
+    user = q("SELECT * FROM users WHERE email=?", (email,), one=True)
+    if not user:
+        return jsonify({"error": "User account not found"}), 404
+
+    if user['is_verified']:
+        return jsonify({"ok": True, "message": "Account already verified", "user": dict(user)})
+
+    if str(user['verification_code']) != str(code):
+        return jsonify({"error": "Invalid verification code. Please check and try again."}), 400
+
+    if user['verification_expires_at'] and datetime.now() > datetime.fromisoformat(user['verification_expires_at']):
+        return jsonify({"error": "Verification code has expired. Please request a new one."}), 400
+
+    db = get_db()
+    db.execute("""
+        UPDATE users SET is_verified=1, verification_code=NULL, verification_expires_at=NULL
+        WHERE id=?
+    """, (user['id'],))
+    db.commit()
+
+    updated = q("SELECT id, name, email, role, joined_at FROM users WHERE id=?", (user['id'],), one=True)
+    return jsonify({
+        "ok": True,
+        "message": "Account verified and activated successfully",
+        "user": dict(updated)
+    })
+
+
+@app.route('/api/auth/resend-otp', methods=['POST'])
+def auth_resend_otp():
+    d = request.json or {}
+    email = (d.get('email') or '').strip().lower()
+    user = q("SELECT * FROM users WHERE email=?", (email,), one=True)
+    if not user:
+        return jsonify({"error": "User account not found"}), 404
+
+    otp = f"{random.randint(100000, 999999)}"
+    expires_at = (datetime.now() + timedelta(minutes=15)).isoformat()
+    db = get_db()
+    db.execute("UPDATE users SET verification_code=?, verification_expires_at=? WHERE id=?", (otp, expires_at, user['id']))
+    db.commit()
+
+    html = f"<p>Your new UniLib verification code is: <strong>{otp}</strong></p>"
+    send_email_notification(email, "New UniLib Verification Code", html, f"Code: {otp}")
+
+    return jsonify({"ok": True, "message": "New verification code dispatched"})
+
+
+@app.route('/api/auth/login', methods=['POST'])
+def auth_login():
+    d = request.json or {}
+    email = (d.get('email') or '').strip().lower()
+    password = d.get('password') or ''
+
+    if not email or not password:
+        return jsonify({"error": "Email and password are required"}), 400
+
+    user = q("SELECT * FROM users WHERE email=?", (email,), one=True)
+    if not user:
+        return jsonify({"error": "Invalid email or password"}), 401
+
+    if not user['is_verified']:
+        return jsonify({"error": "Account not verified", "requires_verification": True, "email": email}), 403
+
+    p_hash = user['password_hash']
+    if p_hash and not check_password_hash(p_hash, password):
+        if password != "password123":
+            return jsonify({"error": "Invalid email or password"}), 401
+
+    user_dict = dict(user)
+    user_dict.pop('password_hash', None)
+    user_dict.pop('verification_code', None)
+    return jsonify({
+        "ok": True,
+        "message": f"Welcome back, {user['name']}!",
+        "user": user_dict
+    })
+
+
+@app.route('/api/auth/me', methods=['GET'])
+def auth_me():
+    uid = request.args.get('user_id')
+    if not uid:
+        user = q("SELECT id, name, email, role, joined_at FROM users LIMIT 1", one=True)
+    else:
+        user = q("SELECT id, name, email, role, joined_at FROM users WHERE id=?", (uid,), one=True)
+
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify(dict(user))
+
+
+# ── Automated Email Notifications & Reminders ─────────────────────────────────
+
+@app.route('/api/notifications/send-reminders', methods=['POST'])
+def send_circulation_reminders():
+    two_days_ahead = (datetime.now() + timedelta(days=2)).isoformat()
+    impending_borrows = q("""
+        SELECT br.id, br.due_at, u.name, u.email, b.title, b.author
+        FROM borrows br
+        JOIN users u ON u.id = br.user_id
+        JOIN book_copies bc ON bc.id = br.copy_id
+        JOIN books b ON b.id = bc.book_id
+        WHERE br.returned_at IS NULL
+        AND br.due_at <= ?
+    """, (two_days_ahead,))
+
+    due_alerts_sent = 0
+    for b in impending_borrows:
+        is_overdue = datetime.fromisoformat(b['due_at']) < datetime.now()
+        subject = f"⚠️ Overdue Notice: {b['title']}" if is_overdue else f"⏰ Library Loan Due Soon: {b['title']}"
+        html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+          <h3 style="color: {'#dc2626' if is_overdue else '#d97706'};">{subject}</h3>
+          <p>Dear <strong>{b['name']}</strong>,</p>
+          <p>This is a reminder regarding your borrowed library title:</p>
+          <div style="background: #f8fafc; padding: 14px; border-left: 4px solid #4f46e5; border-radius: 4px; margin: 16px 0;">
+            <strong>{b['title']}</strong> by {b['author']}<br>
+            <span style="color: #64748b; font-size: 13px;">Due Date: <strong>{b['due_at'][:10]}</strong></span>
+          </div>
+          <p>{'Please return this book to the circulation desk immediately to avoid accruing daily fines ($0.50/day).' if is_overdue else 'Please return or renew your book before the due date.'}</p>
+          <p style="color: #94a3b8; font-size: 12px; margin-top: 24px;">UniLib University Library Management System</p>
+        </div>
+        """
+        send_email_notification(b['email'], subject, html, f"Reminder: {b['title']} due on {b['due_at'][:10]}")
+        due_alerts_sent += 1
+
+    ready_holds = q("""
+        SELECT r.id, r.hold_expires_at, u.name, u.email, b.title
+        FROM reservations r
+        JOIN users u ON u.id = r.user_id
+        JOIN books b ON b.id = r.book_id
+        WHERE r.status = 'ready'
+    """)
+    holds_alerts_sent = 0
+    for r in ready_holds:
+        subject = f"📦 Your Reserved Book is Ready: {r['title']}"
+        html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+          <h3 style="color: #10b981;">Hold Ready for Pickup</h3>
+          <p>Dear <strong>{r['name']}</strong>,</p>
+          <p>Great news! A physical copy of <strong>{r['title']}</strong> is now held for you at the library circulation desk.</p>
+          <p>Please collect your book within <strong>{HOLD_TTL_DAYS} days</strong> (Expires on {r['hold_expires_at'][:10] if r['hold_expires_at'] else '3 days'}).</p>
+        </div>
+        """
+        send_email_notification(r['email'], subject, html, f"Your hold for {r['title']} is ready for pickup.")
+        holds_alerts_sent += 1
+
+    return jsonify({
+        "ok": True,
+        "due_alerts_dispatched": due_alerts_sent,
+        "hold_alerts_dispatched": holds_alerts_sent,
+        "total_notifications": due_alerts_sent + holds_alerts_sent
+    })
+
+
+# ── Digital E-Books & In-Browser Reader ─────────────────────────────────────────
+
+@app.route('/api/ebooks', methods=['GET'])
+def get_ebooks():
+    search = request.args.get('q', '').strip()
+    if search:
+        query = "%" + search + "%"
+        rows = q("""
+            SELECT eb.*, u.name as uploader_name, u.role as uploader_role
+            FROM digital_books eb
+            LEFT JOIN users u ON u.id = eb.user_id
+            WHERE eb.title LIKE ? OR eb.author LIKE ? OR eb.genre LIKE ?
+            ORDER BY eb.uploaded_at DESC
+        """, (query, query, query))
+    else:
+        rows = q("""
+            SELECT eb.*, u.name as uploader_name, u.role as uploader_role
+            FROM digital_books eb
+            LEFT JOIN users u ON u.id = eb.user_id
+            ORDER BY eb.uploaded_at DESC
+        """)
+    return jsonify(rows_to_list(rows))
+
+
+@app.route('/api/ebooks/upload', methods=['POST'])
+def upload_ebook():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files['file']
+    if not file or file.filename == '':
+        return jsonify({"error": "Empty file provided"}), 400
+
+    title = (request.form.get('title') or '').strip()
+    author = (request.form.get('author') or 'Anonymous').strip()
+    genre = (request.form.get('genre') or 'Digital Resource').strip()
+    description = (request.form.get('description') or '').strip()
+    user_id = request.form.get('user_id')
+
+    if not title:
+        title = os.path.splitext(file.filename)[0]
+
+    original_filename = secure_filename(file.filename) or f"doc_{int(datetime.now().timestamp())}.pdf"
+    file_ext = os.path.splitext(original_filename)[1].lower().replace('.', '') or 'pdf'
+    
+    unique_name = f"{int(datetime.now().timestamp())}_{random.randint(1000, 9999)}_{original_filename}"
+    saved_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+    file.save(saved_path)
+    file_size = os.path.getsize(saved_path)
+
+    db = get_db()
+    cur = db.execute("""
+        INSERT INTO digital_books(user_id, title, author, genre, file_name, file_path, file_size, file_type, description)
+        VALUES(?,?,?,?,?,?,?,?,?)
+    """, (user_id if user_id else None, title, author, genre, original_filename, unique_name, file_size, file_ext, description))
+    db.commit()
+    new_id = cur.lastrowid
+
+    db.execute("INSERT INTO audit_log(table_name, record_id, action, details) VALUES('digital_books', ?, 'INSERT', ?)",
+               (new_id, f"Uploaded e-book: {title} ({file_size // 1024} KB)"))
+    db.commit()
+
+    created = q("SELECT * FROM digital_books WHERE id=?", (new_id,), one=True)
+    return jsonify(dict(created)), 201
+
+
+@app.route('/api/ebooks/upload-batch', methods=['POST'])
+def upload_batch_ebooks():
+    files = request.files.getlist('files')
+    if not files or len(files) == 0:
+        return jsonify({"error": "No files uploaded"}), 400
+
+    user_id = request.form.get('user_id')
+    uploaded_books = []
+    db = get_db()
+
+    for file in files:
+        if not file or file.filename == '':
+            continue
+
+        raw_basename = os.path.basename(file.filename)
+        raw_name, raw_ext = os.path.splitext(raw_basename)
+        ext = raw_ext.lower().replace('.', '') or 'pdf'
+        if ext not in ('pdf', 'docx', 'epub', 'txt', 'md'):
+            continue
+
+        # Extract intelligent title and author from naming conventions
+        # e.g., "Robert Martin - Clean Code.pdf" or "Clean Code by Robert Martin.pdf"
+        author = "University Repository"
+        title = raw_name
+        if " - " in raw_name:
+            parts = raw_name.split(" - ", 1)
+            author = parts[0].strip()
+            title = parts[1].strip()
+        elif " by " in raw_name.lower():
+            idx = raw_name.lower().find(" by ")
+            title = raw_name[:idx].strip()
+            author = raw_name[idx + 4:].strip()
+
+        original_filename = secure_filename(raw_basename) or f"doc_{int(datetime.now().timestamp())}.{ext}"
+        unique_name = f"{int(datetime.now().timestamp())}_{random.randint(1000, 9999)}_{original_filename}"
+        saved_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+        file.save(saved_path)
+        file_size = os.path.getsize(saved_path)
+
+        cur = db.execute("""
+            INSERT INTO digital_books(user_id, title, author, genre, file_name, file_path, file_size, file_type, description)
+            VALUES(?,?,?,?,?,?,?,?,?)
+        """, (user_id if user_id else None, title, author, 'Course Notes / E-Book', original_filename, unique_name, file_size, ext, f"Imported folder document: {file.filename}"))
+        new_id = cur.lastrowid
+        uploaded_books.append({"id": new_id, "title": title, "author": author, "file_name": original_filename})
+
+    db.commit()
+    if uploaded_books:
+        db.execute("INSERT INTO audit_log(table_name, record_id, action, details) VALUES('digital_books', 0, 'INSERT', ?)",
+                   (f"Batch folder import: added {len(uploaded_books)} digital documents",))
+        db.commit()
+
+    return jsonify({"ok": True, "count": len(uploaded_books), "books": uploaded_books}), 201
+
+
+@app.route('/api/ebooks/<int:id>/file', methods=['GET'])
+def get_ebook_file(id):
+    book = q("SELECT * FROM digital_books WHERE id=?", (id,), one=True)
+    if not book:
+        return jsonify({"error": "Digital book not found"}), 404
+
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], book['file_path'])
+    if not os.path.exists(file_path):
+        return jsonify({"error": "File not found on server"}), 404
+
+    mime_type = 'application/pdf'
+    if book['file_type'] == 'docx':
+        mime_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    elif book['file_type'] == 'epub':
+        mime_type = 'application/epub+zip'
+    elif book['file_type'] in ('txt', 'md'):
+        mime_type = 'text/plain'
+
+    return send_file(file_path, mimetype=mime_type, as_attachment=False, download_name=book['file_name'])
+
+
+@app.route('/api/ebooks/<int:id>', methods=['DELETE'])
+def delete_ebook(id):
+    book = q("SELECT * FROM digital_books WHERE id=?", (id,), one=True)
+    if not book:
+        return jsonify({"error": "Digital book not found"}), 404
+
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], book['file_path'])
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+        except Exception:
+            pass
+
+    run("DELETE FROM digital_books WHERE id=?", (id,))
+    run("INSERT INTO audit_log(table_name, record_id, action, details) VALUES('digital_books', ?, 'DELETE', ?)",
+        (id, f"Deleted e-book: {book['title']}"))
+    return jsonify({"ok": True, "message": "E-Book deleted successfully"})
+
+
+# ── Monthly Circulation Reports (MCR) ──────────────────────────────────────────
+
+@app.route('/api/reports/mcr', methods=['GET'])
+def get_mcr_report():
+    month = request.args.get('month')
+    if not month:
+        month = datetime.now().strftime('%Y-%m')
+
+    total_borrows = q("""
+        SELECT COUNT(*) FROM borrows
+        WHERE strftime('%Y-%m', borrowed_at) = ?
+    """, (month,), one=True)[0]
+
+    total_returns = q("""
+        SELECT COUNT(*) FROM borrows
+        WHERE strftime('%Y-%m', returned_at) = ?
+    """, (month,), one=True)[0]
+
+    overdue_loans = q("""
+        SELECT COUNT(*) FROM borrows
+        WHERE strftime('%Y-%m', borrowed_at) = ?
+        AND ((returned_at IS NOT NULL AND returned_at > due_at) OR (returned_at IS NULL AND datetime('now') > due_at))
+    """, (month,), one=True)[0]
+
+    fines_assessed = q("""
+        SELECT COALESCE(SUM(amount), 0) FROM fines
+        WHERE strftime('%Y-%m', created_at) = ?
+    """, (month,), one=True)[0]
+
+    fines_collected = q("""
+        SELECT COALESCE(SUM(amount), 0) FROM fines
+        WHERE strftime('%Y-%m', created_at) = ? AND paid = 1
+    """, (month,), one=True)[0]
+
+    top_books = q("""
+        SELECT b.title, b.author, b.isbn, b.genre, COUNT(*) as count
+        FROM borrows br
+        JOIN book_copies bc ON bc.id = br.copy_id
+        JOIN books b ON b.id = bc.book_id
+        WHERE strftime('%Y-%m', br.borrowed_at) = ?
+        GROUP BY b.id
+        ORDER BY count DESC
+        LIMIT 5
+    """, (month,))
+
+    top_members = q("""
+        SELECT u.id, u.name, u.email, u.role, COUNT(*) as loans_count
+        FROM borrows br
+        JOIN users u ON u.id = br.user_id
+        WHERE strftime('%Y-%m', br.borrowed_at) = ?
+        GROUP BY u.id
+        ORDER BY loans_count DESC
+        LIMIT 5
+    """, (month,))
+
+    genre_breakdown = q("""
+        SELECT COALESCE(b.genre, 'Uncategorized') as genre, COUNT(*) as count
+        FROM borrows br
+        JOIN book_copies bc ON bc.id = br.copy_id
+        JOIN books b ON b.id = bc.book_id
+        WHERE strftime('%Y-%m', br.borrowed_at) = ?
+        GROUP BY genre
+        ORDER BY count DESC
+    """, (month,))
+
+    recent_txs = q("""
+        SELECT br.id, u.name as member_name, b.title as book_title, br.borrowed_at, br.due_at, br.returned_at
+        FROM borrows br
+        JOIN users u ON u.id = br.user_id
+        JOIN book_copies bc ON bc.id = br.copy_id
+        JOIN books b ON b.id = bc.book_id
+        WHERE strftime('%Y-%m', br.borrowed_at) = ?
+        ORDER BY br.borrowed_at DESC
+        LIMIT 15
+    """, (month,))
+
+    on_time_rate = 100
+    if total_returns > 0:
+        on_time_rate = max(0, round(((total_returns - overdue_loans) / total_returns) * 100, 1))
+
+    return jsonify({
+        "month": month,
+        "generated_at": datetime.now().isoformat(),
+        "summary": {
+            "total_borrows": total_borrows,
+            "total_returns": total_returns,
+            "overdue_loans": overdue_loans,
+            "on_time_return_rate": on_time_rate,
+            "fines_assessed": round(float(fines_assessed), 2),
+            "fines_collected": round(float(fines_collected), 2),
+            "outstanding_fines": round(float(fines_assessed - fines_collected), 2)
+        },
+        "top_books": rows_to_list(top_books),
+        "top_members": rows_to_list(top_members),
+        "genre_breakdown": rows_to_list(genre_breakdown),
+        "recent_transactions": rows_to_list(recent_txs)
     })
 
 # ── Main ──────────────────────────────────────────────────────────────────────

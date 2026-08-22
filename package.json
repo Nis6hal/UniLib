@@ -1,0 +1,10 @@
+{
+  "name": "unilib",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix client run dev",
+    "build": "npm --prefix client run build",
+    "start": "python app.py"
+  }
+}
