@@ -116,39 +116,58 @@ export default function LandingPage({ onOpenAuth }) {
           </a>
         </div>
 
-        {/* Hero Interactive 3D Floating Book & Orbiting Cards */}
-        <div className="hero-vis-wrapper animate-in">
-          <div className="hero-glow-halo" />
+        {/* Hero Real Academic Photography Showcase */}
+        <div style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: 920,
+          margin: '36px auto 20px',
+          borderRadius: 'var(--radius-xl)',
+          overflow: 'hidden',
+          border: '1px solid var(--border)',
+          boxShadow: '0 25px 60px rgba(0,0,0,0.8), 0 0 40px rgba(212,175,55,0.15)',
+        }} className="animate-in">
+          <img
+            src="https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1400&auto=format&fit=crop&q=80"
+            alt="University Library Reading Hall"
+            style={{
+              width: '100%',
+              height: 360,
+              objectFit: 'cover',
+              filter: 'brightness(0.78) contrast(1.1)',
+              display: 'block'
+            }}
+          />
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'linear-gradient(180deg, rgba(10,12,16,0.2) 0%, rgba(10,12,16,0.85) 100%)',
+            display: 'flex',
+            alignItems: 'flex-end',
+            padding: '24px 28px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', width: '100%', flexWrap: 'wrap', gap: 16 }}>
+              <div>
+                <span className="badge-mini" style={{ marginBottom: 6 }}>Central Academic Repository</span>
+                <h3 style={{ fontSize: '1.35rem', fontFamily: 'var(--font-display)', color: '#fff', margin: 0 }}>
+                  Connecting Physical Stacks with Global Digital Research
+                </h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+                  Over 12,000 physical volumes, 45,000 digital papers, and personal student notes.
+                </p>
+              </div>
 
-          {/* Orbiting Metadata Badges */}
-          <div className="orbiting-card card-1">
-            <BookOpen size={16} color="var(--primary)" /> Physical Stock: 12,000+ Copies
-          </div>
-          <div className="orbiting-card card-2">
-            <FileCode size={16} color="var(--info)" /> Research DOI & Theses Repository
-          </div>
-          <div className="orbiting-card card-3">
-            <FolderUp size={16} color="var(--success)" /> Personal Study Vault & Folders
-          </div>
-          <div className="orbiting-card card-4">
-            <Bot size={16} color="var(--warning)" /> AI-Grounded Document Assistant
-          </div>
-
-          {/* Central 3D Hardcover Book */}
-          <div className="hero-floating-book">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <span className="badge-mini">Vol 2026</span>
-              <Sparkles size={14} color="var(--primary)" />
-            </div>
-            <h3 style={{ fontSize: '1.2rem', fontFamily: 'var(--font-display)', color: '#fff', marginTop: 10 }}>
-              Principles of Modern Computer Science
-            </h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>
-              Faculty of Engineering & Computing
-            </p>
-            <div style={{ marginTop: 'auto', borderTop: '1px solid rgba(212,175,55,0.3)', paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600 }}>Active Shelf Copy</span>
-              <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>Available</span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <span className="badge badge-info" style={{ backdropFilter: 'blur(10px)', background: 'rgba(56,189,248,0.2)' }}>
+                  100% Real-Time
+                </span>
+                <span className="badge badge-success" style={{ backdropFilter: 'blur(10px)', background: 'rgba(16,185,129,0.2)' }}>
+                  Campus Online
+                </span>
+              </div>
             </div>
           </div>
         </div>
