@@ -1986,3 +1986,247 @@ p.success {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
 }
+
+/* ==========================================================================
+   Cinematic Storytelling & Interactive Visualization Styles
+   ========================================================================== */
+
+/* Hero Floating 3D Book & Particle Rings */
+.hero-vis-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+  height: 380px;
+  margin: 36px auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 1200px;
+}
+
+.hero-glow-halo {
+  position: absolute;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(212, 175, 55, 0.2) 0%, rgba(234, 179, 8, 0.05) 50%, transparent 70%);
+  filter: blur(40px);
+  animation: haloPulse 6s ease-in-out infinite alternate;
+}
+
+@keyframes haloPulse {
+  0% { transform: scale(0.85); opacity: 0.6; }
+  100% { transform: scale(1.15); opacity: 1; }
+}
+
+.hero-floating-book {
+  width: 220px;
+  height: 300px;
+  background: linear-gradient(135deg, #1e2430 0%, #0d1017 100%);
+  border: 2px solid rgba(212, 175, 55, 0.5);
+  border-radius: 8px 18px 18px 8px;
+  box-shadow: 
+    -12px 0 24px rgba(0, 0, 0, 0.8),
+    12px 24px 50px rgba(0, 0, 0, 0.9),
+    0 0 35px rgba(212, 175, 55, 0.25);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 20px;
+  position: relative;
+  z-index: 5;
+  transform: rotateY(-18deg) rotateX(10deg);
+  animation: bookFloat 5s ease-in-out infinite alternate;
+}
+
+@keyframes bookFloat {
+  0% { transform: translateY(0) rotateY(-18deg) rotateX(10deg); }
+  100% { transform: translateY(-16px) rotateY(-12deg) rotateX(6deg); }
+}
+
+.orbiting-card {
+  position: absolute;
+  background: rgba(18, 22, 30, 0.88);
+  border: 1px solid var(--border);
+  backdrop-filter: var(--backdrop-blur);
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-main);
+  z-index: 10;
+  transition: transform 0.3s ease;
+}
+
+.orbiting-card.card-1 {
+  top: 40px;
+  left: 30px;
+  animation: orbitFloat1 6s ease-in-out infinite alternate;
+}
+
+.orbiting-card.card-2 {
+  bottom: 50px;
+  left: 40px;
+  animation: orbitFloat2 7s ease-in-out infinite alternate;
+}
+
+.orbiting-card.card-3 {
+  top: 60px;
+  right: 30px;
+  animation: orbitFloat3 6.5s ease-in-out infinite alternate;
+}
+
+.orbiting-card.card-4 {
+  bottom: 40px;
+  right: 40px;
+  animation: orbitFloat4 7.5s ease-in-out infinite alternate;
+}
+
+@keyframes orbitFloat1 { 0% { transform: translateY(0); } 100% { transform: translateY(-12px) translateX(6px); } }
+@keyframes orbitFloat2 { 0% { transform: translateY(0); } 100% { transform: translateY(14px) translateX(-6px); } }
+@keyframes orbitFloat3 { 0% { transform: translateY(0); } 100% { transform: translateY(-10px) translateX(-8px); } }
+@keyframes orbitFloat4 { 0% { transform: translateY(0); } 100% { transform: translateY(12px) translateX(8px); } }
+
+/* Storytelling Scenes Section */
+.story-section {
+  padding: 80px 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.story-header {
+  text-align: center;
+  max-width: 760px;
+  margin: 0 auto 54px;
+}
+
+.scene-card-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 44px 40px;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: var(--backdrop-blur);
+  margin-bottom: 54px;
+  box-shadow: var(--shadow-md);
+}
+
+.scene-card-container:hover {
+  border-color: rgba(212, 175, 55, 0.35);
+  box-shadow: var(--shadow-lg), 0 0 35px rgba(212, 175, 55, 0.08);
+}
+
+.scene-step-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: var(--radius-full);
+  background: var(--primary-light);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 16px;
+}
+
+/* Interactive Search Simulation Box */
+.search-sim-widget {
+  background: #0a0c10;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-top: 24px;
+}
+
+.search-sim-input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  background: #12151d;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+}
+
+/* Interactive Reader Simulation */
+.reader-sim-wrapper {
+  background: #090c12;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  font-family: var(--font-body);
+}
+
+.reader-sim-highlight {
+  background: rgba(212, 175, 55, 0.3);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border-bottom: 2px solid var(--primary);
+}
+
+.reader-sim-sticky-note {
+  background: rgba(234, 179, 8, 0.15);
+  border-left: 3px solid var(--primary);
+  padding: 10px 14px;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  margin: 16px 0;
+  font-size: 0.85rem;
+}
+
+/* SVG Academic Knowledge Graph */
+.knowledge-graph-container {
+  width: 100%;
+  height: 340px;
+  background: #0a0c10;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Interactive AI Study Assistant Sandbox */
+.ai-sim-chatbox {
+  background: #0a0c10;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ai-bubble-user {
+  align-self: flex-end;
+  background: var(--primary-light);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  color: var(--text-main);
+  padding: 10px 18px;
+  border-radius: 18px 18px 4px 18px;
+  max-width: 80%;
+  font-size: 0.88rem;
+}
+
+.ai-bubble-bot {
+  align-self: flex-start;
+  background: #151922;
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  padding: 14px 20px;
+  border-radius: 18px 18px 18px 4px;
+  max-width: 85%;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
