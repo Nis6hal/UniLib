@@ -33,6 +33,18 @@ export default function EBookReader({ currentUser }) {
   const [error, setError] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadMode, setUploadMode] = useState('single'); // 'single' | 'folder'
+  const [uploadScopeFilter, setUploadScopeFilter] = useState('all'); // 'all' | 'institutional' | 'personal'
+
+  // Filtered eBooks based on selected tab
+  const filteredEBooks = ebooks.filter((eb) => {
+    if (uploadScopeFilter === 'institutional') {
+      return eb.uploader_role === 'admin' || eb.uploader_role === 'librarian' || !eb.user_id;
+    }
+    if (uploadScopeFilter === 'personal') {
+      return currentUser?.id && eb.user_id === currentUser.id;
+    }
+    return true;
+  });
 
   // Single Upload Form
   const [uploadForm, setUploadForm] = useState({
@@ -228,8 +240,8 @@ export default function EBookReader({ currentUser }) {
         </button>
       </div>
 
-      {/* Search Toolbar */}
-      <div className="search-toolbar">
+      {/* Search Toolbar & Scope Tabs */}
+      <div className="search-toolbar" style={{ marginBottom: 16 }}>
         <form className="search-box-wrapper" onSubmit={handleSearch}>
           <Search size={16} />
           <input
@@ -241,82 +253,109 @@ export default function EBookReader({ currentUser }) {
         </form>
       </div>
 
+      {/* Origin Scope Filter Tabs */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 24 }}>
+        {[
+          { id: 'all', label: 'All Digital Resources' },
+          { id: 'institutional', label: '🏛️ Institutional Repository (Admin & Faculty)' },
+          { id: 'personal', label: '📁 My Personal Vault' }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={uploadScopeFilter === tab.id ? 'btn' : 'secondary'}
+            style={{ padding: '6px 14px', fontSize: '0.8rem', borderRadius: 'var(--radius-full)' }}
+            onClick={() => setUploadScopeFilter(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {loading && <Spinner message="Loading digital collection..." />}
       {error && <p className="error">Error: {error}</p>}
 
-      {!loading && !error && ebooks.length === 0 && (
+      {!loading && !error && filteredEBooks.length === 0 && (
         <div className="empty-state">
           <BookOpenCheck className="empty-icon" />
-          <p>No digital documents found in your library.</p>
+          <p>No digital documents found in this section.</p>
           <button style={{ marginTop: 12 }} onClick={() => setShowUploadModal(true)}>
-            <UploadCloud size={16} /> Upload Your First Document or Folder
+            <UploadCloud size={16} /> Upload Document or Folder
           </button>
         </div>
       )}
 
       {/* Digital Books Grid */}
-      {!loading && !error && ebooks.length > 0 && (
+      {!loading && !error && filteredEBooks.length > 0 && (
         <div className="books-grid">
-          {ebooks.map((eb) => (
-            <div key={eb.id} className="book-card">
-              <div
-                className="book-card-spine"
-                style={{
-                  background: eb.file_type === 'pdf'
-                    ? 'linear-gradient(180deg, #d4af37, #f59e0b)'
-                    : 'linear-gradient(180deg, #38bdf8, #818cf8)'
-                }}
-              />
-              <div className="book-card-header">
-                <span className="book-genre-tag">{eb.genre || 'Digital'}</span>
-                <span className="badge badge-info">
-                  {eb.file_type?.toUpperCase()} • {((eb.file_size || 0) / 1024).toFixed(0)} KB
-                </span>
-              </div>
+          {filteredEBooks.map((eb) => {
+            const isInstitutional = eb.uploader_role === 'admin' || eb.uploader_role === 'librarian' || !eb.user_id;
+            return (
+              <div key={eb.id} className="book-card">
+                <div
+                  className="book-card-spine"
+                  style={{
+                    background: isInstitutional
+                      ? 'linear-gradient(180deg, #d4af37, #f59e0b)'
+                      : 'linear-gradient(180deg, #38bdf8, #818cf8)'
+                  }}
+                />
+                <div className="book-card-header">
+                  <span className="book-genre-tag">{eb.genre || 'Digital'}</span>
+                  <span className={`badge ${isInstitutional ? 'badge-warning' : 'badge-info'}`}>
+                    {isInstitutional ? '🏛️ College Resource' : '👤 Personal Vault'}
+                  </span>
+                </div>
 
-              <h3 className="book-card-title" title={eb.title}>
-                {eb.title}
-              </h3>
-              <p className="book-card-author">by {eb.author}</p>
+                <h3 className="book-card-title" title={eb.title}>
+                  {eb.title}
+                </h3>
+                <p className="book-card-author">by {eb.author}</p>
 
-              {eb.description && (
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 14, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                  {eb.description}
-                </p>
-              )}
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginBottom: 10, display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{eb.file_type?.toUpperCase()} • {((eb.file_size || 0) / 1024).toFixed(0)} KB</span>
+                  <span>{eb.uploader_name ? `By ${eb.uploader_name}` : 'Library Staff'}</span>
+                </div>
 
-              <div className="book-card-footer" style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-                <button
-                  className="btn"
-                  style={{ padding: '6px 14px', fontSize: '0.8rem', flex: 1 }}
-                  onClick={() => openReader(eb)}
-                >
-                  <Eye size={14} /> Read Now
-                </button>
-
-                <a
-                  href={api.getEBookFileUrl(eb.id)}
-                  download={eb.file_name}
-                  className="btn secondary"
-                  style={{ padding: '6px 10px', fontSize: '0.8rem' }}
-                  title="Download Document"
-                >
-                  <Download size={14} />
-                </a>
-
-                {(currentUser?.role === 'admin' || currentUser?.id === eb.user_id) && (
-                  <button
-                    className="ghost"
-                    style={{ color: 'var(--danger)', padding: '6px' }}
-                    onClick={() => handleDeleteEBook(eb.id, eb.title)}
-                    title="Delete Document"
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                {eb.description && (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 14, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                    {eb.description}
+                  </p>
                 )}
+
+                <div className="book-card-footer" style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 'auto' }}>
+                  <button
+                    className="btn"
+                    style={{ padding: '6px 14px', fontSize: '0.8rem', flex: 1 }}
+                    onClick={() => openReader(eb)}
+                  >
+                    <Eye size={14} /> Read Now
+                  </button>
+
+                  <a
+                    href={api.getEBookFileUrl(eb.id)}
+                    download={eb.file_name}
+                    className="btn secondary"
+                    style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                    title="Download Document"
+                  >
+                    <Download size={14} />
+                  </a>
+
+                  {(currentUser?.role === 'admin' || currentUser?.id === eb.user_id) && (
+                    <button
+                      className="ghost"
+                      style={{ color: 'var(--danger)', padding: '6px' }}
+                      onClick={() => handleDeleteEBook(eb.id, eb.title)}
+                      title="Delete Document"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
