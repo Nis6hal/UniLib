@@ -78,6 +78,9 @@ export const api = {
   uploadBatchEBooks: (formData) => request('/ebooks/upload-batch', { method: 'POST', body: formData }),
   deleteEBook: (id) => request(`/ebooks/${id}`, { method: 'DELETE' }),
   getEBookFileUrl: (id) => `${BASE}/ebooks/${id}/file`,
+  getEBookContent: (id, userId) => request(`/ebooks/${id}/content${userId ? `?user_id=${userId}` : ''}`),
+  saveReadingProgress: (id, data) => request(`/ebooks/${id}/progress`, { method: 'POST', body: JSON.stringify(data) }),
+  getCurrentlyReading: (userId) => request(`/ebooks/currently-reading?user_id=${userId}`),
 
   // ── Automated Reminders & Notifications ──
   sendReminders: () => request('/notifications/send-reminders', { method: 'POST' }),
@@ -143,9 +146,11 @@ export const api = {
   // ── Document RAG & Study Assistant ──
   ragAsk: (data) => request('/rag/ask', { method: 'POST', body: JSON.stringify(data) }),
   ragQuiz: (data) => request('/rag/quiz', { method: 'POST', body: JSON.stringify(data) }),
+  ragFlashcards: (data) => request('/rag/flashcards', { method: 'POST', body: JSON.stringify(data) }),
 
   // ── Analytics & System ──
   getStats: (userId) => request(`/stats${userId ? `?user_id=${userId}` : ''}`),
+  getPublicStats: () => request('/stats/public'),
   getAudit: () => request('/audit'),
   healCopies: () => request('/admin/heal', { method: 'POST' }),
 };

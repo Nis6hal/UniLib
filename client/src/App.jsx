@@ -34,6 +34,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
+  const [selectedEBook, setSelectedEBook] = useState(null);
+
+  const handleOpenReaderForBook = (book) => {
+    setSelectedEBook(book);
+    setActiveTab('ebooks');
+  };
 
   const handleAuthSuccess = (user) => {
     setCurrentUser(user);
@@ -59,17 +65,17 @@ export default function App() {
   const renderTab = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard currentUser={currentUser} />;
+        return <Dashboard currentUser={currentUser} onNavigate={setActiveTab} />;
       case 'curriculum':
-        return <CourseCurriculum currentUser={currentUser} onNavigateToBook={() => setActiveTab('books')} onNavigateToReader={() => setActiveTab('ebooks')} />;
+        return <CourseCurriculum currentUser={currentUser} onNavigateToBook={() => setActiveTab('books')} onNavigateToReader={handleOpenReaderForBook} />;
       case 'notes':
-        return <StudyNotesHub currentUser={currentUser} onOpenReader={() => setActiveTab('ebooks')} />;
+        return <StudyNotesHub currentUser={currentUser} onOpenReader={handleOpenReaderForBook} />;
       case 'research':
         return <ResearchRepository currentUser={currentUser} />;
       case 'books':
         return <BookList currentUser={currentUser} />;
       case 'ebooks':
-        return <EBookReader currentUser={currentUser} />;
+        return <EBookReader currentUser={currentUser} initialBook={selectedEBook} />;
       case 'members':
         return <MemberList currentUser={currentUser} />;
       case 'borrows':
@@ -83,7 +89,7 @@ export default function App() {
       case 'audit':
         return <AuditLog currentUser={currentUser} />;
       default:
-        return <Dashboard currentUser={currentUser} />;
+        return <Dashboard currentUser={currentUser} onNavigate={setActiveTab} />;
     }
   };
 
