@@ -97,6 +97,16 @@ export const api = {
   createCourse: (data) => request('/courses', { method: 'POST', body: JSON.stringify(data) }),
   mapCourseResource: (courseId, data) => request(`/courses/${courseId}/resources`, { method: 'POST', body: JSON.stringify(data) }),
   removeCourseResource: (mappingId) => request(`/courses/resources/${mappingId}`, { method: 'DELETE' }),
+  uploadCourseFolderTree: (formData) => {
+    return fetch(`${BASE}/courses/upload-folder-tree`, {
+      method: 'POST',
+      body: formData,
+    }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Folder import failed');
+      return data;
+    });
+  },
 
   // ── Study Notes & Highlights ──
   getAnnotations: (userId, documentId) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import { useToast } from './Toast';
 import Spinner from './Spinner';
@@ -16,7 +16,9 @@ import {
   Tag,
   BookMarked,
   CheckCircle2,
-  Library
+  Library,
+  FolderUp,
+  UploadCloud
 } from 'lucide-react';
 
 export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavigateToReader }) {
@@ -30,11 +32,17 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
   const [showAddModal, setShowAddModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
 
+  // Folder Tree Auto-Catalog state
+  const [showFolderModal, setShowFolderModal] = useState(false);
+  const [folderTreeFiles, setFolderTreeFiles] = useState([]);
+  const [isFolderUploading, setIsFolderUploading] = useState(false);
+  const folderInputRef = React.useRef(null);
+
   // Form states
   const [courseForm, setCourseForm] = useState({
     code: '',
     name: '',
-    department: 'Computer Science',
+    department: 'BE COMPUTERS',
     semester: 4,
     description: '',
     credits: 3,
@@ -59,7 +67,7 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
       setLoading(true);
       const data = await api.getCourses(selectedDept, selectedSem);
       setCourses(data);
-      if (data.length > 0 && !selectedCourse) {
+      if (data.length > 0 && (!selectedCourse || !data.some((c) => c.id === selectedCourse.id))) {
         loadCourseDetail(data[0]);
       }
     } catch (e) {
@@ -100,13 +108,67 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
     loadAvailableResources();
   }, [selectedDept, selectedSem]);
 
+  const handleFolderSelect = (e) => {
+    const rawFiles = Array.from(e.target.files || []);
+    const parsed = rawFiles.map((f) => {
+      const relPath = f.webkitRelativePath || f.name;
+      const parts = relPath.replace(/\\/g, '/').split('/').filter(Boolean);
+      let sem = 'Auto';
+      let subject = 'General';
+      if (parts.length >= 3) {
+        sem = parts[0];
+        subject = parts[1];
+      } else if (parts.length === 2) {
+        subject = parts[0];
+      }
+      return {
+        file: f,
+        name: f.name,
+        relPath,
+        semesterHint: sem,
+        subjectHint: subject,
+        size: (f.size / (1024 * 1024)).toFixed(2)
+      };
+    });
+    setFolderTreeFiles(parsed);
+  };
+
+  const handleUploadFolderTree = async (e) => {
+    e.preventDefault();
+    if (folderTreeFiles.length === 0) return;
+    try {
+      setIsFolderUploading(true);
+      const formData = new FormData();
+      if (currentUser?.id) formData.append('user_id', currentUser.id);
+      formData.append('department', 'BE COMPUTERS');
+
+      folderTreeFiles.forEach((item) => {
+        formData.append('files', item.file);
+        formData.append('paths', item.relPath);
+      });
+
+      const res = await api.uploadCourseFolderTree(formData);
+      addToast(
+        `Success! Auto-cataloged ${res.courses_created?.length || 0} new subjects and linked ${res.total_files} documents!`,
+        'success'
+      );
+      setShowFolderModal(false);
+      setFolderTreeFiles([]);
+      loadCourses();
+    } catch (err) {
+      addToast(err.message, 'error');
+    } finally {
+      setIsFolderUploading(false);
+    }
+  };
+
   const handleCreateCourse = async (e) => {
     e.preventDefault();
     try {
       await api.createCourse(courseForm);
       addToast(`Course ${courseForm.code} created!`, 'success');
       setShowAddModal(false);
-      setCourseForm({ code: '', name: '', department: 'Computer Science', semester: 4, description: '', credits: 3, instructor: '' });
+      setCourseForm({ code: '', name: '', department: 'BE COMPUTERS', semester: 4, description: '', credits: 3, instructor: '' });
       loadCourses();
     } catch (e) {
       addToast(e.message, 'error');
@@ -139,11 +201,15 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
 
   const departments = ['All', 'BE COMPUTERS'];
   const semesters = [
-    { id: 'All', label: 'All Semesters' },
-    { id: '1', label: 'Year I • Sem I' },
-    { id: '2', label: 'Year I • Sem II' },
-    { id: '3', label: 'Year II • Sem III' },
-    { id: '4', label: 'Year II • Sem IV' }
+    { id: 'All', label: 'All 8 Semesters' },
+    { id: '1', label: 'Sem I' },
+    { id: '2', label: 'Sem II' },
+    { id: '3', label: 'Sem III' },
+    { id: '4', label: 'Sem IV' },
+    { id: '5', label: 'Sem V' },
+    { id: '6', label: 'Sem VI' },
+    { id: '7', label: 'Sem VII' },
+    { id: '8', label: 'Sem VIII' }
   ];
 
   return (
@@ -151,16 +217,21 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
       {/* Section Header */}
       <div className="section-header">
         <div>
-          <h1 className="page-title">Curriculum Structure: BE COMPUTERS</h1>
+          <h1 className="page-title">Curriculum Structure: BE COMPUTERS (All 8 Semesters)</h1>
           <p className="subtitle">
-            Official Bachelor of Computer Engineering curriculum with credit breakdown, L-T-P lecture hours, and linked library resources
+            Bachelor of Computer Engineering syllabus with credit breakdown, L-T-P lecture hours, and mapped library resources
           </p>
         </div>
 
         {isStaff && (
-          <button onClick={() => setShowAddModal(true)}>
-            <Plus size={16} /> Add Course
-          </button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="secondary" onClick={() => setShowFolderModal(true)}>
+              <FolderUp size={16} /> Import Folder & Auto-Create Subjects
+            </button>
+            <button onClick={() => setShowAddModal(true)}>
+              <Plus size={16} /> Add Course
+            </button>
+          </div>
         )}
       </div>
 
@@ -441,6 +512,70 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
                 <button type="button" className="secondary" onClick={() => setShowMapModal(false)}>Cancel</button>
                 <button type="submit">Link to Course</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Smart Folder Tree & Subfolders Auto-Catalog Modal */}
+      {showFolderModal && (
+        <div className="modal-overlay" onClick={() => setShowFolderModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
+            <div className="modal-header">
+              <div>
+                <h2>Auto-Catalog Folder & Subfolders</h2>
+                <p className="subtitle">
+                  Upload an entire folder containing course folders (e.g. <code>Semester 4/Operating Systems/...</code>). Subjects and resources will be auto-generated in the database!
+                </p>
+              </div>
+              <button className="modal-close" onClick={() => setShowFolderModal(false)}><X size={18} /></button>
+            </div>
+
+            <form onSubmit={handleUploadFolderTree}>
+              <div className="form-group" style={{ marginBottom: 18 }}>
+                <label>Select Folder with Subdirectories</label>
+                <input
+                  ref={folderInputRef}
+                  type="file"
+                  webkitdirectory="true"
+                  directory="true"
+                  multiple
+                  onChange={handleFolderSelect}
+                />
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                  💡 The system reads your directory structure. For example, a folder named <code>Semester 4/Computer Networks/Ch1.pdf</code> will automatically create the subject <strong>Computer Networks</strong> in <strong>Semester 4</strong> and link the document!
+                </p>
+              </div>
+
+              {folderTreeFiles.length > 0 && (
+                <div style={{ maxHeight: 240, overflowY: 'auto', background: '#0a0c10', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 12, marginBottom: 18 }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--primary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <CheckCircle2 size={14} /> Detected {folderTreeFiles.length} files to auto-catalog:
+                  </div>
+                  {folderTreeFiles.map((f, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '65%' }}>
+                        <strong>{f.name}</strong>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{f.relPath}</div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <span className="badge badge-warning" style={{ fontSize: '0.68rem' }}>{f.subjectHint}</span>
+                        <span className="badge badge-info" style={{ fontSize: '0.68rem' }}>{f.size} MB</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+                <button type="button" className="secondary" onClick={() => setShowFolderModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={isFolderUploading || folderTreeFiles.length === 0}>
+                  <UploadCloud size={16} />
+                  {isFolderUploading ? 'Auto-Cataloging Subfolders...' : `Auto-Catalog & Import ${folderTreeFiles.length} Files`}
+                </button>
               </div>
             </form>
           </div>

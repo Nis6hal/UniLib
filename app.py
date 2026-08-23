@@ -1533,6 +1533,112 @@ def get_mcr_report():
 
 # ── Academic Courses & Curriculum ─────────────────────────────────────────────
 
+@app.route('/api/courses/upload-folder-tree', methods=['POST'])
+def upload_course_folder_tree():
+    files = request.files.getlist('files')
+    rel_paths = request.form.getlist('paths')
+    user_id = request.form.get('user_id')
+    department = request.form.get('department', 'BE COMPUTERS').strip() or 'BE COMPUTERS'
+
+    if not files or len(files) == 0:
+        return jsonify({"error": "No files uploaded"}), 400
+
+    db = get_db()
+    created_courses = []
+    linked_resources = []
+    
+    # Process each file and its relative subfolder path
+    for i, file in enumerate(files):
+        if not file or file.filename == '':
+            continue
+            
+        rel_path = rel_paths[i] if i < len(rel_paths) else file.filename
+        raw_basename = os.path.basename(file.filename)
+        raw_name, raw_ext = os.path.splitext(raw_basename)
+        ext = raw_ext.lower().replace('.', '') or 'pdf'
+        if ext not in ('pdf', 'docx', 'epub', 'txt', 'md', 'pptx'):
+            continue
+
+        clean_path = rel_path.replace('\\', '/').strip('/')
+        parts = [p.strip() for p in clean_path.split('/') if p.strip()]
+
+        semester_num = 1
+        subject_name = "General Academic Resources"
+
+        # Search for semester number in folder hierarchy
+        for p in parts[:-1]:
+            low = p.lower()
+            match = re.search(r'(?:sem(?:ester)?|year\s*[1-4]\s*sem(?:ester)?)\s*[-_]?\s*([1-8])', low)
+            if match:
+                semester_num = int(match.group(1))
+            elif low in ('sem 1', 'sem 2', 'sem 3', 'sem 4', 'sem 5', 'sem 6', 'sem 7', 'sem 8'):
+                semester_num = int(low.replace('sem', '').strip())
+            elif low.startswith(('1', '2', '3', '4', '5', '6', '7', '8')) and len(low) == 1:
+                semester_num = int(low)
+
+        # Extract Subject Name from the folder right above the file
+        if len(parts) >= 2:
+            parent = parts[-2]
+            if re.search(r'^(?:sem(?:ester)?\s*[1-8]|year\s*[1-4])$', parent.lower()):
+                subject_name = f"Semester {semester_num} Core"
+            else:
+                subject_name = parent
+        elif len(parts) == 1:
+            subject_name = f"Semester {semester_num} General"
+
+        # Check if course exists or auto-create it
+        existing_course = db.execute(
+            "SELECT id, code, name FROM courses WHERE LOWER(name)=LOWER(?) AND department=?",
+            (subject_name, department)
+        ).fetchone()
+
+        if not existing_course:
+            existing_course = db.execute(
+                "SELECT id, code, name FROM courses WHERE (LOWER(name) LIKE ? OR LOWER(code) LIKE ?) AND department=?",
+                (f"%{subject_name.lower()}%", f"%{subject_name.lower()}%", department)
+            ).fetchone()
+
+        if existing_course:
+            course_id = existing_course[0]
+        else:
+            auto_code = f"CMP-{semester_num}0{random.randint(1, 9)}"
+            cur = db.execute(
+                "INSERT INTO courses(code, name, department, semester, description, credits, instructor) VALUES(?,?,?,?,?,?,?)",
+                (auto_code, subject_name, department, semester_num, f"Auto-cataloged course from uploaded directory: {subject_name}", 3, "Department Faculty")
+            )
+            course_id = cur.lastrowid
+            created_courses.append({"id": course_id, "code": auto_code, "name": subject_name, "semester": semester_num})
+
+        # Save physical file to uploads directory
+        original_filename = secure_filename(raw_basename) or f"doc_{int(datetime.now().timestamp())}.{ext}"
+        unique_name = f"{int(datetime.now().timestamp())}_{random.randint(1000, 9999)}_{original_filename}"
+        saved_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+        file.save(saved_path)
+        file_size = os.path.getsize(saved_path)
+
+        # Register in digital_books
+        doc_cur = db.execute("""
+            INSERT INTO digital_books(user_id, title, author, genre, file_name, file_path, file_size, file_type, description)
+            VALUES(?,?,?,?,?,?,?,?,?)
+        """, (user_id if user_id else None, raw_name, department, subject_name, original_filename, unique_name, file_size, ext, f"Course Resource for {subject_name}"))
+        doc_id = doc_cur.lastrowid
+
+        # Bind into course_resources
+        db.execute("""
+            INSERT INTO course_resources(course_id, resource_type, resource_id, is_required, notes)
+            VALUES(?, 'digital', ?, 1, ?)
+        """, (course_id, doc_id, f"Auto-imported resource: {original_filename}"))
+        linked_resources.append({"course_id": course_id, "course_name": subject_name, "file_name": original_filename, "doc_id": doc_id})
+
+    db.commit()
+    return jsonify({
+        "ok": True,
+        "total_files": len(linked_resources),
+        "courses_created": created_courses,
+        "linked_resources": linked_resources
+    }), 201
+
+
 @app.route('/api/courses', methods=['GET'])
 def get_courses():
     dept = request.args.get('department', '').strip()
@@ -1818,7 +1924,7 @@ if __name__ == '__main__':
     init_db()
     seed_db()
     
-    # Reset and seed strictly the official BE COMPUTERS curriculum structure
+    # Reset and seed strictly the official BE COMPUTERS curriculum structure for all 8 Semesters
     db = sqlite3.connect(DB_PATH)
     db.execute("DELETE FROM course_resources")
     db.execute("DELETE FROM courses")
@@ -1848,7 +1954,46 @@ if __name__ == '__main__':
         ("CMP", "Operating Systems", "BE COMPUTERS", 3, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
         ("ELX", "Microprocessor and Assembly Language Programming", "BE COMPUTERS", 3, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electronics"),
         ("CMP 241", "Computer Graphics", "BE COMPUTERS", 3, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
-        ("CMM 340", "Data Communication", "BE COMPUTERS", 3, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electronics & Comm.")
+        ("CMM 340", "Data Communication", "BE COMPUTERS", 3, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electronics & Comm."),
+
+        # Year II, Semester IV
+        ("MTH 221", "Probability and Statistics", "BE COMPUTERS", 4, "Credit: 3 • Lecture Hours: (L: 3, T: 2, P: 0)", 3, "Faculty of Mathematics"),
+        ("CMP 227", "Object Oriented Analysis and Design", "BE COMPUTERS", 4, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+        ("CMP 232", "Theory of Computation", "BE COMPUTERS", 4, "Credit: 3 • Lecture Hours: (L: 3, T: 2, P: 0)", 3, "Faculty of Computer Engineering"),
+        ("ELX 233", "Microprocessor System Design", "BE COMPUTERS", 4, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electronics"),
+        ("CMP 242", "Computer Networks", "BE COMPUTERS", 4, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+        ("ENG 221", "Technical Communication & Economics", "BE COMPUTERS", 4, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 0)", 3, "Faculty of Humanities"),
+
+        # Year III, Semester V
+        ("CMP 311", "Computer Architecture & Organization", "BE COMPUTERS", 5, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+        ("CMP 321", "Software Engineering", "BE COMPUTERS", 5, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+        ("CMP 331", "Design & Analysis of Algorithms", "BE COMPUTERS", 5, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 3)", 3, "Faculty of Computer Engineering"),
+        ("ELX 341", "Digital Signal Processing (DSP)", "BE COMPUTERS", 5, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electronics"),
+        ("CMP 351", "Web Technologies & Applications", "BE COMPUTERS", 5, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 3)", 3, "Faculty of Computer Engineering"),
+        ("MGT 311", "Organization & Management", "BE COMPUTERS", 5, "Credit: 2 • Lecture Hours: (L: 2, T: 1, P: 0)", 2, "Faculty of Management"),
+
+        # Year III, Semester VI
+        ("CMP 361", "Artificial Intelligence & Expert Systems", "BE COMPUTERS", 6, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+        ("CMP 371", "Compiler Design", "BE COMPUTERS", 6, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 3)", 3, "Faculty of Computer Engineering"),
+        ("CMP 381", "Embedded Systems & IoT", "BE COMPUTERS", 6, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+        ("CMP 391", "Network Security & Cryptography", "BE COMPUTERS", 6, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+        ("MGT 321", "Engineering Project Management", "BE COMPUTERS", 6, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 0)", 3, "Faculty of Management"),
+        ("CMP 399", "Minor Project / Capstone I", "BE COMPUTERS", 6, "Credit: 2 • Lecture Hours: (L: 0, T: 0, P: 4)", 2, "Faculty of Computer Engineering"),
+
+        # Year IV, Semester VII
+        ("CMP 411", "Distributed Systems & Cloud Computing", "BE COMPUTERS", 7, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+        ("CMP 421", "Big Data Analytics & Data Science", "BE COMPUTERS", 7, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+        ("CMP 431", "Machine Learning & Deep Neural Networks", "BE COMPUTERS", 7, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 3)", 3, "Faculty of Computer Engineering"),
+        ("CMP 481", "Elective I (Cybersecurity / NLP)", "BE COMPUTERS", 7, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+        ("ENG 411", "Engineering Ethics & Professional Practice", "BE COMPUTERS", 7, "Credit: 2 • Lecture Hours: (L: 2, T: 0, P: 0)", 2, "Faculty of Humanities"),
+        ("CMP 490", "Project (Phase I)", "BE COMPUTERS", 7, "Credit: 3 • Lecture Hours: (L: 0, T: 0, P: 6)", 3, "Faculty of Computer Engineering"),
+
+        # Year IV, Semester VIII
+        ("CMP 441", "Information Systems & Architecture", "BE COMPUTERS", 8, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+        ("CMP 482", "Elective II (Computer Vision / Blockchain)", "BE COMPUTERS", 8, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+        ("CMP 483", "Elective III (Software Quality Assurance)", "BE COMPUTERS", 8, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+        ("CMP 499", "Major Final Year Project (Phase II)", "BE COMPUTERS", 8, "Credit: 6 • Lecture Hours: (L: 0, T: 0, P: 12)", 6, "Faculty of Computer Engineering"),
+        ("CMP 495", "Internship / Industrial Practicum", "BE COMPUTERS", 8, "Credit: 2 • Lecture Hours: (L: 0, T: 0, P: 4)", 2, "Faculty of Computer Engineering")
     ]
 
     for sc in be_computer_courses:
@@ -1877,4 +2022,3 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('DEBUG', 'true').lower() in ('true', '1', 'yes')
     app.run(host=host, port=port, debug=debug)
-
