@@ -246,7 +246,12 @@ def init_db():
         if 'hold_expires_at' not in existing_res:
             db.execute("ALTER TABLE reservations ADD COLUMN hold_expires_at TEXT")
 
-    # digital_books: user uploaded ebooks & documents
+    # Ensure courses table does not have outdated UNIQUE constraint on code
+    courses_sql = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='courses'").fetchone()
+    if courses_sql and courses_sql[0] and 'code TEXT UNIQUE' in courses_sql[0]:
+        db.execute("DROP TABLE IF EXISTS course_resources")
+        db.execute("DROP TABLE IF EXISTS courses")
+
     db.executescript("""
     CREATE TABLE IF NOT EXISTS digital_books (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -355,6 +360,87 @@ def init_db():
     ]
     for title, img_url in book_covers:
         db.execute("UPDATE books SET cover_image = ? WHERE title = ? AND (cover_image IS NULL OR cover_image = '')", (img_url, title))
+
+    # Seed official BE COMPUTERS curriculum if courses table is empty
+    if db.execute("SELECT COUNT(*) FROM courses").fetchone()[0] == 0:
+        be_computer_courses = [
+            # Year I, Semester I
+            ("MTH", "Calculus I", "BE COMPUTERS", 1, "Credit: 3 • Lecture Hours: (L: 3, T: 2, P: 0)", 3, "Faculty of Mathematics"),
+            ("ELX", "Digital Logic", "BE COMPUTERS", 1, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electronics"),
+            ("CMP", "Programming in C", "BE COMPUTERS", 1, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 3)", 3, "Faculty of Computer Engineering"),
+            ("ELE 110", "Basic Electrical Engineering", "BE COMPUTERS", 1, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electrical Engineering"),
+            ("CMP", "Computer Workshop", "BE COMPUTERS", 1, "Credit: 1 • Lecture Hours: (L: 0, T: 0, P: 3)", 1, "Faculty of Computer Engineering"),
+            ("ENG", "Communication Technique", "BE COMPUTERS", 1, "Credit: 2 • Lecture Hours: (L: 2, T: 1, P: 0)", 2, "Faculty of Humanities"),
+            ("ELX 211", "Electronics Devices and Circuits", "BE COMPUTERS", 1, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electronics"),
+
+            # Year I, Semester II
+            ("MTH", "Algebra and Geometry", "BE COMPUTERS", 2, "Credit: 3 • Lecture Hours: (L: 3, T: 2, P: 0)", 3, "Faculty of Mathematics"),
+            ("PHY", "Applied Physics", "BE COMPUTERS", 2, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Applied Sciences"),
+            ("CHM", "Applied Chemistry", "BE COMPUTERS", 2, "Credit: 2 • Lecture Hours: (L: 2, T: 1, P: 2)", 2, "Faculty of Applied Sciences"),
+            ("MEC", "Basic Engineering Drawing", "BE COMPUTERS", 2, "Credit: 1 • Lecture Hours: (L: 0, T: 0, P: 3)", 1, "Faculty of Mechanical Engineering"),
+            ("CMP 115", "Object Oriented Programming in C++", "BE COMPUTERS", 2, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 3)", 3, "Faculty of Computer Engineering"),
+            ("CMP 225", "Data Structure and Algorithm", "BE COMPUTERS", 2, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 3)", 3, "Faculty of Computer Engineering"),
+            ("ELE", "Instrumentation", "BE COMPUTERS", 2, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electrical Engineering"),
+
+            # Year II, Semester III
+            ("MTH", "Calculus II", "BE COMPUTERS", 3, "Credit: 3 • Lecture Hours: (L: 3, T: 2, P: 0)", 3, "Faculty of Mathematics"),
+            ("CMP 226", "Database Management System", "BE COMPUTERS", 3, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 3)", 3, "Faculty of Computer Engineering"),
+            ("CMP", "Operating Systems", "BE COMPUTERS", 3, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+            ("ELX", "Microprocessor and Assembly Language Programming", "BE COMPUTERS", 3, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electronics"),
+            ("CMP 241", "Computer Graphics", "BE COMPUTERS", 3, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+            ("CMM 340", "Data Communication", "BE COMPUTERS", 3, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electronics & Comm."),
+
+            # Year II, Semester IV
+            ("MTH 221", "Probability and Statistics", "BE COMPUTERS", 4, "Credit: 3 • Lecture Hours: (L: 3, T: 2, P: 0)", 3, "Faculty of Mathematics"),
+            ("CMP 227", "Object Oriented Analysis and Design", "BE COMPUTERS", 4, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+            ("CMP 232", "Theory of Computation", "BE COMPUTERS", 4, "Credit: 3 • Lecture Hours: (L: 3, T: 2, P: 0)", 3, "Faculty of Computer Engineering"),
+            ("ELX 233", "Microprocessor System Design", "BE COMPUTERS", 4, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electronics"),
+            ("CMP 242", "Computer Networks", "BE COMPUTERS", 4, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+            ("ENG 221", "Technical Communication & Economics", "BE COMPUTERS", 4, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 0)", 3, "Faculty of Humanities"),
+
+            # Year III, Semester V
+            ("CMP 311", "Computer Architecture & Organization", "BE COMPUTERS", 5, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+            ("CMP 321", "Software Engineering", "BE COMPUTERS", 5, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+            ("CMP 331", "Design & Analysis of Algorithms", "BE COMPUTERS", 5, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 3)", 3, "Faculty of Computer Engineering"),
+            ("ELX 341", "Digital Signal Processing (DSP)", "BE COMPUTERS", 5, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electronics"),
+            ("CMP 351", "Web Technologies & Applications", "BE COMPUTERS", 5, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 3)", 3, "Faculty of Computer Engineering"),
+            ("MGT 311", "Organization & Management", "BE COMPUTERS", 5, "Credit: 2 • Lecture Hours: (L: 2, T: 1, P: 0)", 2, "Faculty of Management"),
+
+            # Year III, Semester VI
+            ("CMP 361", "Artificial Intelligence & Expert Systems", "BE COMPUTERS", 6, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+            ("CMP 371", "Compiler Design", "BE COMPUTERS", 6, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 3)", 3, "Faculty of Computer Engineering"),
+            ("CMP 381", "Embedded Systems & IoT", "BE COMPUTERS", 6, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+            ("CMP 391", "Network Security & Cryptography", "BE COMPUTERS", 6, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+            ("MGT 321", "Engineering Project Management", "BE COMPUTERS", 6, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 0)", 3, "Faculty of Management"),
+            ("CMP 399", "Minor Project / Capstone I", "BE COMPUTERS", 6, "Credit: 2 • Lecture Hours: (L: 0, T: 0, P: 4)", 2, "Faculty of Computer Engineering"),
+
+            # Year IV, Semester VII
+            ("CMP 411", "Distributed Systems & Cloud Computing", "BE COMPUTERS", 7, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+            ("CMP 421", "Big Data Analytics & Data Science", "BE COMPUTERS", 7, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+            ("CMP 431", "Machine Learning & Deep Neural Networks", "BE COMPUTERS", 7, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 3)", 3, "Faculty of Computer Engineering"),
+            ("CMP 481", "Elective I (Cybersecurity / NLP)", "BE COMPUTERS", 7, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+            ("ENG 411", "Engineering Ethics & Professional Practice", "BE COMPUTERS", 7, "Credit: 2 • Lecture Hours: (L: 2, T: 0, P: 0)", 2, "Faculty of Humanities"),
+            ("CMP 490", "Project (Phase I)", "BE COMPUTERS", 7, "Credit: 3 • Lecture Hours: (L: 0, T: 0, P: 6)", 3, "Faculty of Computer Engineering"),
+
+            # Year IV, Semester VIII
+            ("CMP 441", "Information Systems & Architecture", "BE COMPUTERS", 8, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+            ("CMP 482", "Elective II (Computer Vision / Blockchain)", "BE COMPUTERS", 8, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+            ("CMP 483", "Elective III (Software Quality Assurance)", "BE COMPUTERS", 8, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+            ("CMP 499", "Major Final Year Project (Phase II)", "BE COMPUTERS", 8, "Credit: 6 • Lecture Hours: (L: 0, T: 0, P: 12)", 6, "Faculty of Computer Engineering"),
+            ("CMP 495", "Internship / Industrial Practicum", "BE COMPUTERS", 8, "Credit: 2 • Lecture Hours: (L: 0, T: 0, P: 4)", 2, "Faculty of Computer Engineering")
+        ]
+        for sc in be_computer_courses:
+            db.execute("INSERT INTO courses(code, name, department, semester, description, credits, instructor) VALUES(?,?,?,?,?,?,?)", sc)
+
+    if db.execute("SELECT COUNT(*) FROM research_papers").fetchone()[0] == 0:
+        sample_papers = [
+            ("Attention Is All You Need", "Vaswani et al.", "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks. We propose the Transformer, a model architecture eschewing recurrence.", "10.48550/arXiv.1706.03762", "NeurIPS 2017", 2017, "Computer Science", "Google Research", 1420),
+            ("Spanner: Google’s Globally-Distributed Database", "Corbett et al.", "Spanner is Google's scalable, multi-version, globally-distributed, and synchronously-replicated database. It supports externally-consistent distributed transactions using TrueTime API.", "10.1145/2491245.2491247", "ACM TOCS", 2013, "Computer Science", "Google Systems", 850),
+            ("Deep Residual Learning for Image Recognition", "Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun", "Deeper neural networks are more difficult to train. We present a residual learning framework to ease the training of networks that are substantially deeper than those used previously.", "10.1109/CVPR.2016.90", "IEEE CVPR", 2016, "Computer Science", "Microsoft Research", 2100),
+            ("A Relational Model of Data for Large Shared Data Banks", "E. F. Codd", "Future users of large data banks must be protected from having to know how the data is organized in the machine. This paper introduces the relational model of data.", "10.1145/362384.362685", "Communications of the ACM", 1970, "Computer Science", "IBM Research", 4500)
+        ]
+        for sp in sample_papers:
+            db.execute("INSERT INTO research_papers(title, authors, abstract, doi, journal, publication_year, department, supervisor, citations_count) VALUES(?,?,?,?,?,?,?,?,?)", sp)
 
     db.commit()
     db.close()
