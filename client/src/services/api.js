@@ -96,6 +96,16 @@ export const api = {
   getCourseDetail: (id) => request(`/courses/${id}`),
   createCourse: (data) => request('/courses', { method: 'POST', body: JSON.stringify(data) }),
   mapCourseResource: (courseId, data) => request(`/courses/${courseId}/resources`, { method: 'POST', body: JSON.stringify(data) }),
+  uploadCourseResource: (courseId, formData) => {
+    return fetch(`${BASE}/courses/${courseId}/upload-resource`, {
+      method: 'POST',
+      body: formData,
+    }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      return data;
+    });
+  },
   removeCourseResource: (mappingId) => request(`/courses/resources/${mappingId}`, { method: 'DELETE' }),
   uploadCourseFolderTree: (formData) => {
     return fetch(`${BASE}/courses/upload-folder-tree`, {

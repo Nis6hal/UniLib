@@ -32,11 +32,23 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
   const [showAddModal, setShowAddModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
 
+  // Resource Modal state (Direct upload vs Link existing)
+  const [resourceModalMode, setResourceModalMode] = useState('upload'); // 'upload' | 'library'
+  const [directUploadForm, setDirectUploadForm] = useState({
+    file: null,
+    title: '',
+    author: '',
+    notes: 'Core Textbook / Lecture Material',
+    is_required: true
+  });
+  const [isDirectUploading, setIsDirectUploading] = useState(false);
+
   // Folder Tree Auto-Catalog state
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [folderTreeFiles, setFolderTreeFiles] = useState([]);
   const [isFolderUploading, setIsFolderUploading] = useState(false);
-  const folderInputRef = React.useRef(null);
+  const [folderUploadProgress, setFolderUploadProgress] = useState(0);
+  const folderInputRef = useRef(null);
 
   // Form states
   const [courseForm, setCourseForm] = useState({
@@ -138,27 +150,75 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
     if (folderTreeFiles.length === 0) return;
     try {
       setIsFolderUploading(true);
-      const formData = new FormData();
-      if (currentUser?.id) formData.append('user_id', currentUser.id);
-      formData.append('department', 'BE COMPUTERS');
+      setFolderUploadProgress(10);
 
-      folderTreeFiles.forEach((item) => {
-        formData.append('files', item.file);
-        formData.append('paths', item.relPath);
-      });
+      // Process in batches of 10 files to avoid hitting payload limits
+      const CHUNK_SIZE = 10;
+      let totalImported = 0;
+      let totalCreated = 0;
 
-      const res = await api.uploadCourseFolderTree(formData);
+      for (let i = 0; i < folderTreeFiles.length; i += CHUNK_SIZE) {
+        const chunk = folderTreeFiles.slice(i, i + CHUNK_SIZE);
+        const formData = new FormData();
+        if (currentUser?.id) formData.append('user_id', currentUser.id);
+        formData.append('department', 'BE COMPUTERS');
+
+        chunk.forEach((item) => {
+          formData.append('files', item.file);
+          formData.append('paths', item.relPath);
+        });
+
+        const res = await api.uploadCourseFolderTree(formData);
+        totalImported += res.total_files || 0;
+        totalCreated += res.courses_created?.length || 0;
+
+        const pct = Math.min(95, Math.round(((i + chunk.length) / folderTreeFiles.length) * 100));
+        setFolderUploadProgress(pct);
+      }
+
+      setFolderUploadProgress(100);
       addToast(
-        `Success! Auto-cataloged ${res.courses_created?.length || 0} new subjects and linked ${res.total_files} documents!`,
+        `Success! Imported ${totalImported} documents across ${totalCreated} new/updated subjects!`,
         'success'
       );
       setShowFolderModal(false);
       setFolderTreeFiles([]);
+      setFolderUploadProgress(0);
       loadCourses();
     } catch (err) {
       addToast(err.message, 'error');
     } finally {
       setIsFolderUploading(false);
+    }
+  };
+
+  const handleDirectUploadResource = async (e) => {
+    e.preventDefault();
+    if (!selectedCourse) return;
+    if (!directUploadForm.file) {
+      addToast('Please select a file to upload', 'error');
+      return;
+    }
+
+    try {
+      setIsDirectUploading(true);
+      const formData = new FormData();
+      formData.append('file', directUploadForm.file);
+      formData.append('title', directUploadForm.title || directUploadForm.file.name);
+      formData.append('author', directUploadForm.author || selectedCourse.instructor || 'Faculty');
+      formData.append('notes', directUploadForm.notes);
+      formData.append('is_required', directUploadForm.is_required ? '1' : '0');
+      if (currentUser?.id) formData.append('user_id', currentUser.id);
+
+      await api.uploadCourseResource(selectedCourse.id, formData);
+      addToast('Resource uploaded and attached to course curriculum!', 'success');
+      setShowMapModal(false);
+      setDirectUploadForm({ file: null, title: '', author: '', notes: 'Core Textbook / Lecture Material', is_required: true });
+      loadCourseDetail(selectedCourse);
+    } catch (err) {
+      addToast(err.message, 'error');
+    } finally {
+      setIsDirectUploading(false);
     }
   };
 
@@ -475,45 +535,134 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
         </div>
       )}
 
-      {/* Link Resource Modal */}
+      {/* Link / Upload Resource Modal */}
       {showMapModal && selectedCourse && (
         <div className="modal-overlay" onClick={() => setShowMapModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 580 }}>
             <div className="modal-header">
-              <h2>Link Resource to {selectedCourse.code}</h2>
+              <div>
+                <h2>Add Resource to {selectedCourse.code}</h2>
+                <p className="subtitle">{selectedCourse.name}</p>
+              </div>
               <button className="modal-close" onClick={() => setShowMapModal(false)}><X size={18} /></button>
             </div>
-            <form onSubmit={handleMapResource}>
-              <div className="form-group" style={{ marginBottom: 14 }}>
-                <label>Resource Type</label>
-                <select value={mapForm.resource_type} onChange={(e) => setMapForm({ ...mapForm, resource_type: e.target.value, resource_id: '' })}>
-                  <option value="book">Physical Book Catalog</option>
-                  <option value="digital">Digital E-Book / PDF Slide Deck</option>
-                </select>
-              </div>
 
-              <div className="form-group" style={{ marginBottom: 14 }}>
-                <label>Select Item</label>
-                <select required value={mapForm.resource_id} onChange={(e) => setMapForm({ ...mapForm, resource_id: e.target.value })}>
-                  <option value="">-- Choose an item --</option>
-                  {mapForm.resource_type === 'book' ? (
-                    catalogBooks.map((b) => <option key={b.id} value={b.id}>{b.title} (by {b.author})</option>)
-                  ) : (
-                    digitalBooks.map((d) => <option key={d.id} value={d.id}>{d.title} (by {d.author})</option>)
-                  )}
-                </select>
-              </div>
+            {/* Mode Selector Tabs */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
+              <button
+                type="button"
+                className={resourceModalMode === 'upload' ? 'btn' : 'secondary'}
+                style={{ flex: 1, padding: '8px 12px', fontSize: '0.82rem' }}
+                onClick={() => setResourceModalMode('upload')}
+              >
+                <UploadCloud size={14} /> Upload File from Laptop / Server
+              </button>
+              <button
+                type="button"
+                className={resourceModalMode === 'library' ? 'btn' : 'secondary'}
+                style={{ flex: 1, padding: '8px 12px', fontSize: '0.82rem' }}
+                onClick={() => setResourceModalMode('library')}
+              >
+                <BookOpen size={14} /> Select from Library Shelf
+              </button>
+            </div>
 
-              <div className="form-group" style={{ marginBottom: 14 }}>
-                <label>Notes / Recommendation Level</label>
-                <input placeholder="e.g. Primary Course Textbook, Chapter 1-6" value={mapForm.notes} onChange={(e) => setMapForm({ ...mapForm, notes: e.target.value })} />
-              </div>
+            {resourceModalMode === 'upload' ? (
+              /* Mode 1: Direct File Upload from Computer */
+              <form onSubmit={handleDirectUploadResource}>
+                <div className="form-group" style={{ marginBottom: 14 }}>
+                  <label>Select PDF / Document from Your Device</label>
+                  <input
+                    required
+                    type="file"
+                    accept=".pdf,.docx,.epub,.txt,.md,.pptx"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        const name = f.name.replace(/\.[^/.]+$/, '');
+                        setDirectUploadForm({
+                          ...directUploadForm,
+                          file: f,
+                          title: directUploadForm.title || name
+                        });
+                      }
+                    }}
+                  />
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                    Supports PDF, DOCX, EPUB, TXT, PPTX (up to 1 GB)
+                  </p>
+                </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-                <button type="button" className="secondary" onClick={() => setShowMapModal(false)}>Cancel</button>
-                <button type="submit">Link to Course</button>
-              </div>
-            </form>
+                <div className="form-group" style={{ marginBottom: 14 }}>
+                  <label>Document / Slide Title</label>
+                  <input
+                    required
+                    placeholder="e.g. Chapter 1 - Introduction to Databases"
+                    value={directUploadForm.title}
+                    onChange={(e) => setDirectUploadForm({ ...directUploadForm, title: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 14 }}>
+                  <label>Author / Lecturer</label>
+                  <input
+                    placeholder="e.g. Course Faculty"
+                    value={directUploadForm.author}
+                    onChange={(e) => setDirectUploadForm({ ...directUploadForm, author: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 14 }}>
+                  <label>Curriculum Notes / Scope</label>
+                  <input
+                    placeholder="e.g. Core Lecture Slides, Unit 1 to 3"
+                    value={directUploadForm.notes}
+                    onChange={(e) => setDirectUploadForm({ ...directUploadForm, notes: e.target.value })}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+                  <button type="button" className="secondary" onClick={() => setShowMapModal(false)}>Cancel</button>
+                  <button type="submit" disabled={isDirectUploading || !directUploadForm.file}>
+                    <UploadCloud size={15} />
+                    {isDirectUploading ? 'Uploading & Linking...' : 'Upload & Attach to Subject'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* Mode 2: Link Existing Resource from Shelf */
+              <form onSubmit={handleMapResource}>
+                <div className="form-group" style={{ marginBottom: 14 }}>
+                  <label>Resource Type</label>
+                  <select value={mapForm.resource_type} onChange={(e) => setMapForm({ ...mapForm, resource_type: e.target.value, resource_id: '' })}>
+                    <option value="book">Physical Book Catalog</option>
+                    <option value="digital">Digital E-Book / PDF Slide Deck</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 14 }}>
+                  <label>Select Item</label>
+                  <select required value={mapForm.resource_id} onChange={(e) => setMapForm({ ...mapForm, resource_id: e.target.value })}>
+                    <option value="">-- Choose an item --</option>
+                    {mapForm.resource_type === 'book' ? (
+                      catalogBooks.map((b) => <option key={b.id} value={b.id}>{b.title} (by {b.author})</option>)
+                    ) : (
+                      digitalBooks.map((d) => <option key={d.id} value={d.id}>{d.title} (by {d.author})</option>)
+                    )}
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 14 }}>
+                  <label>Notes / Recommendation Level</label>
+                  <input placeholder="e.g. Primary Course Textbook, Chapter 1-6" value={mapForm.notes} onChange={(e) => setMapForm({ ...mapForm, notes: e.target.value })} />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+                  <button type="button" className="secondary" onClick={() => setShowMapModal(false)}>Cancel</button>
+                  <button type="submit">Link to Course</button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
@@ -548,8 +697,20 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
                 </p>
               </div>
 
+              {folderUploadProgress > 0 && (
+                <div style={{ marginBottom: 18 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--primary)', marginBottom: 4 }}>
+                    <span>Importing & Processing Files in Batches...</span>
+                    <span>{folderUploadProgress}%</span>
+                  </div>
+                  <div style={{ height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${folderUploadProgress}%`, background: 'var(--primary)', transition: 'width 0.3s ease' }} />
+                  </div>
+                </div>
+              )}
+
               {folderTreeFiles.length > 0 && (
-                <div style={{ maxHeight: 240, overflowY: 'auto', background: '#0a0c10', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 12, marginBottom: 18 }}>
+                <div style={{ maxHeight: 220, overflowY: 'auto', background: '#0a0c10', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 12, marginBottom: 18 }}>
                   <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--primary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <CheckCircle2 size={14} /> Detected {folderTreeFiles.length} files to auto-catalog:
                   </div>

@@ -29,7 +29,7 @@ DB_PATH = os.path.join(os.path.dirname(__file__), 'unilib.db')
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB limit
+app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1GB payload limit
 
 MAX_BORROWS   = 5
 MAX_RENEWALS  = 2
@@ -1818,6 +1818,59 @@ def map_course_resource(cid):
     cur = run("INSERT INTO course_resources(course_id, resource_type, resource_id, is_required, notes) VALUES(?,?,?,?,?)",
               (cid, res_type, res_id, is_req, notes))
     return jsonify({"id": cur.lastrowid, "ok": True}), 201
+
+
+@app.route('/api/courses/<int:cid>/upload-resource', methods=['POST'])
+def upload_course_resource_file(cid):
+    course = q("SELECT * FROM courses WHERE id=?", (cid,), one=True)
+    if not course:
+        return jsonify({"error": "Course not found"}), 404
+
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files['file']
+    if not file or file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+
+    title = (request.form.get('title') or file.filename).strip()
+    author = (request.form.get('author') or course['instructor'] or 'Faculty').strip()
+    notes = (request.form.get('notes') or 'Core Course Material').strip()
+    is_required = 1 if request.form.get('is_required') in ('1', 'true', True) else 0
+    user_id = request.form.get('user_id')
+
+    raw_basename = os.path.basename(file.filename)
+    raw_name, raw_ext = os.path.splitext(raw_basename)
+    ext = raw_ext.lower().replace('.', '') or 'pdf'
+
+    original_filename = secure_filename(raw_basename) or f"doc_{int(datetime.now().timestamp())}.{ext}"
+    unique_name = f"{int(datetime.now().timestamp())}_{random.randint(1000, 9999)}_{original_filename}"
+    saved_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+    file.save(saved_path)
+    file_size = os.path.getsize(saved_path)
+
+    db = get_db()
+    cur = db.execute("""
+        INSERT INTO digital_books(user_id, title, author, genre, file_name, file_path, file_size, file_type, description)
+        VALUES(?,?,?,?,?,?,?,?,?)
+    """, (user_id if user_id else None, title, author, course['name'], original_filename, unique_name, file_size, ext, f"Resource for {course['code']} - {course['name']}"))
+    doc_id = cur.lastrowid
+
+    # Link directly into course_resources
+    map_cur = db.execute("""
+        INSERT INTO course_resources(course_id, resource_type, resource_id, is_required, notes)
+        VALUES(?, 'digital', ?, ?, ?)
+    """, (cid, doc_id, is_required, notes))
+    mapping_id = map_cur.lastrowid
+    db.commit()
+
+    return jsonify({
+        "ok": True,
+        "message": "Resource uploaded and mapped to course successfully",
+        "doc_id": doc_id,
+        "mapping_id": mapping_id,
+        "title": title
+    }), 201
 
 @app.route('/api/courses/resources/<int:mid>', methods=['DELETE'])
 def remove_course_resource(mid):
