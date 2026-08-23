@@ -9,6 +9,7 @@ from email.mime.multipart import MIMEMultipart
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from flask import Flask, request, jsonify, send_from_directory, send_file, g
+from server.rag_engine import rag_engine
 
 # Load .env configuration if present
 env_file = os.path.join(os.path.dirname(__file__), '.env')
@@ -246,7 +247,7 @@ def init_db():
             db.execute("ALTER TABLE reservations ADD COLUMN hold_expires_at TEXT")
 
     # digital_books: user uploaded ebooks & documents
-    db.execute("""
+    db.executescript("""
     CREATE TABLE IF NOT EXISTS digital_books (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -259,6 +260,61 @@ def init_db():
         file_type TEXT DEFAULT 'pdf',
         description TEXT,
         uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS courses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        department TEXT NOT NULL,
+        semester INTEGER NOT NULL DEFAULT 1,
+        description TEXT,
+        credits INTEGER DEFAULT 3,
+        instructor TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS course_resources (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        resource_type TEXT NOT NULL CHECK(resource_type IN ('book', 'digital', 'research', 'paper')),
+        resource_id INTEGER NOT NULL,
+        is_required INTEGER DEFAULT 1,
+        notes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS document_annotations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        document_id INTEGER NOT NULL,
+        page_number INTEGER DEFAULT 1,
+        highlighted_text TEXT,
+        note_text TEXT,
+        color TEXT DEFAULT '#d4af37',
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS research_papers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        authors TEXT NOT NULL,
+        abstract TEXT,
+        doi TEXT,
+        journal TEXT,
+        publication_year INTEGER DEFAULT 2024,
+        department TEXT,
+        supervisor TEXT,
+        file_name TEXT,
+        citations_count INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS document_chunks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_id INTEGER NOT NULL,
+        chunk_index INTEGER NOT NULL,
+        page_number INTEGER DEFAULT 1,
+        content TEXT NOT NULL,
+        token_count INTEGER DEFAULT 0
     );
     """)
 
@@ -1474,12 +1530,327 @@ def get_mcr_report():
         "recent_transactions": rows_to_list(recent_txs)
     })
 
+
+# ── Academic Courses & Curriculum ─────────────────────────────────────────────
+
+@app.route('/api/courses', methods=['GET'])
+def get_courses():
+    dept = request.args.get('department', '').strip()
+    sem  = request.args.get('semester', '').strip()
+    sql = "SELECT * FROM courses WHERE 1=1"
+    params = []
+    if dept and dept != 'All':
+        sql += " AND department = ?"
+        params.append(dept)
+    if sem and sem != 'All':
+        sql += " AND semester = ?"
+        params.append(int(sem))
+    sql += " ORDER BY department, semester, code"
+    courses = rows_to_list(q(sql, params))
+
+    # Attach resource count
+    for c in courses:
+        res_count = q("SELECT COUNT(*) FROM course_resources WHERE course_id=?", (c['id'],), one=True)[0]
+        c['resource_count'] = res_count
+
+    return jsonify(courses)
+
+@app.route('/api/courses/<int:cid>', methods=['GET'])
+def get_course_detail(cid):
+    course = q("SELECT * FROM courses WHERE id=?", (cid,), one=True)
+    if not course: return jsonify({"error": "Course not found"}), 404
+
+    # Fetch physical books mapped
+    books = rows_to_list(q("""
+        SELECT b.*, cr.is_required, cr.notes as course_notes, cr.id as mapping_id
+        FROM course_resources cr
+        JOIN books b ON b.id = cr.resource_id
+        WHERE cr.course_id=? AND cr.resource_type='book'
+    """, (cid,)))
+
+    # Fetch digital resources mapped
+    digital = rows_to_list(q("""
+        SELECT eb.*, cr.is_required, cr.notes as course_notes, cr.id as mapping_id
+        FROM course_resources cr
+        JOIN digital_books eb ON eb.id = cr.resource_id
+        WHERE cr.course_id=? AND cr.resource_type='digital'
+    """, (cid,)))
+
+    # Fetch research papers mapped
+    research = rows_to_list(q("""
+        SELECT rp.*, cr.is_required, cr.notes as course_notes, cr.id as mapping_id
+        FROM course_resources cr
+        JOIN research_papers rp ON rp.id = cr.resource_id
+        WHERE cr.course_id=? AND cr.resource_type='research'
+    """, (cid,)))
+
+    return jsonify({
+        "course": dict(course),
+        "textbooks": books,
+        "digital_resources": digital,
+        "research_papers": research
+    })
+
+@app.route('/api/courses', methods=['POST'])
+def create_course():
+    d = request.json or {}
+    code = (d.get('code') or '').strip()
+    name = (d.get('name') or '').strip()
+    dept = (d.get('department') or 'Computer Science').strip()
+    sem  = int(d.get('semester') or 1)
+    desc = (d.get('description') or '').strip()
+    credits = int(d.get('credits') or 3)
+    inst = (d.get('instructor') or 'Faculty Member').strip()
+
+    if not code or not name:
+        return jsonify({"error": "Course code and name required"}), 400
+
+    try:
+        cur = run("INSERT INTO courses(code, name, department, semester, description, credits, instructor) VALUES(?,?,?,?,?,?,?)",
+                  (code, name, dept, sem, desc, credits, inst))
+        cid = cur.lastrowid
+        run("INSERT INTO audit_log(table_name,record_id,action,details) VALUES('courses',?,'INSERT',?)",
+            (cid, f"Created course {code} - {name}"))
+        return jsonify({"id": cid, "code": code, "name": name}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/courses/<int:cid>/resources', methods=['POST'])
+def map_course_resource(cid):
+    d = request.json or {}
+    res_type = d.get('resource_type')
+    res_id   = int(d.get('resource_id'))
+    is_req   = 1 if d.get('is_required', True) else 0
+    notes    = d.get('notes', '')
+
+    cur = run("INSERT INTO course_resources(course_id, resource_type, resource_id, is_required, notes) VALUES(?,?,?,?,?)",
+              (cid, res_type, res_id, is_req, notes))
+    return jsonify({"id": cur.lastrowid, "ok": True}), 201
+
+@app.route('/api/courses/resources/<int:mid>', methods=['DELETE'])
+def remove_course_resource(mid):
+    run("DELETE FROM course_resources WHERE id=?", (mid,))
+    return jsonify({"ok": True})
+
+
+# ── Study Notes & In-Reader Highlights ────────────────────────────────────────
+
+@app.route('/api/annotations', methods=['GET'])
+def get_annotations():
+    uid = request.args.get('user_id')
+    doc_id = request.args.get('document_id')
+    sql = """
+        SELECT da.*, eb.title as document_title, eb.author as document_author
+        FROM document_annotations da
+        JOIN digital_books eb ON eb.id = da.document_id
+        WHERE 1=1
+    """
+    params = []
+    if uid:
+        sql += " AND da.user_id = ?"
+        params.append(int(uid))
+    if doc_id:
+        sql += " AND da.document_id = ?"
+        params.append(int(doc_id))
+    sql += " ORDER BY da.created_at DESC"
+    return jsonify(rows_to_list(q(sql, params)))
+
+@app.route('/api/annotations', methods=['POST'])
+def create_annotation():
+    d = request.json or {}
+    uid = int(d.get('user_id', 1))
+    doc_id = int(d.get('document_id', 1))
+    page = int(d.get('page_number', 1))
+    highlight = (d.get('highlighted_text') or '').strip()
+    note = (d.get('note_text') or '').strip()
+    color = d.get('color', '#d4af37')
+
+    if not highlight and not note:
+        return jsonify({"error": "Either highlighted text or note required"}), 400
+
+    cur = run("""
+        INSERT INTO document_annotations(user_id, document_id, page_number, highlighted_text, note_text, color)
+        VALUES(?,?,?,?,?,?)
+    """, (uid, doc_id, page, highlight, note, color))
+
+    return jsonify({"id": cur.lastrowid, "ok": True}), 201
+
+@app.route('/api/annotations/<int:aid>', methods=['DELETE'])
+def delete_annotation(aid):
+    run("DELETE FROM document_annotations WHERE id=?", (aid,))
+    return jsonify({"ok": True})
+
+
+# ── Academic Research Papers & Theses Repository ──────────────────────────────
+
+@app.route('/api/research', methods=['GET'])
+def get_research_papers():
+    search = request.args.get('q', '').strip()
+    dept = request.args.get('department', '').strip()
+    sql = "SELECT * FROM research_papers WHERE 1=1"
+    params = []
+    if search:
+        query = "%" + search + "%"
+        sql += " AND (title LIKE ? OR authors LIKE ? OR abstract LIKE ? OR doi LIKE ?)"
+        params.extend([query, query, query, query])
+    if dept and dept != 'All':
+        sql += " AND department = ?"
+        params.append(dept)
+    sql += " ORDER BY publication_year DESC, created_at DESC"
+    return jsonify(rows_to_list(q(sql, params)))
+
+@app.route('/api/research/<int:rpid>/cite', methods=['GET'])
+def cite_research_paper(rpid):
+    p = q("SELECT * FROM research_papers WHERE id=?", (rpid,), one=True)
+    if not p: return jsonify({"error": "Not found"}), 404
+
+    # Generate standard citation formats
+    apa = f"{p['authors']} ({p['publication_year']}). {p['title']}. {p['journal'] or 'Institutional Repository'}. https://doi.org/{p['doi'] or '10.xxxx/unilib'}"
+    ieee = f"{p['authors']}, \"{p['title']},\" in {p['journal'] or 'Academic Repository'}, {p['publication_year']}, doi: {p['doi'] or '10.xxxx/unilib'}."
+    bibtex = f"""@article{{unilib_{p['id']},
+  title={{{p['title']}}},
+  author={{{p['authors']}}},
+  journal={{{p['journal'] or 'UniLib Academic Repository'}}},
+  year={{{p['publication_year']}}},
+  doi={{{p['doi'] or '10.xxxx/unilib'}}}
+}}"""
+    return jsonify({
+        "paper": dict(p),
+        "citations": {
+            "apa": apa,
+            "ieee": ieee,
+            "bibtex": bibtex
+        }
+    })
+
+@app.route('/api/research', methods=['POST'])
+def create_research_paper():
+    d = request.json or {}
+    title = (d.get('title') or '').strip()
+    authors = (d.get('authors') or 'Faculty & Students').strip()
+    abstract = (d.get('abstract') or '').strip()
+    doi = (d.get('doi') or '').strip()
+    journal = (d.get('journal') or 'Academic Repository').strip()
+    year = int(d.get('publication_year') or datetime.now().year)
+    dept = (d.get('department') or 'Computer Science').strip()
+    supervisor = (d.get('supervisor') or '').strip()
+
+    if not title: return jsonify({"error": "Title required"}), 400
+
+    cur = run("""
+        INSERT INTO research_papers(title, authors, abstract, doi, journal, publication_year, department, supervisor)
+        VALUES(?,?,?,?,?,?,?,?)
+    """, (title, authors, abstract, doi, journal, year, dept, supervisor))
+
+    return jsonify({"id": cur.lastrowid, "ok": True}), 201
+
+
+# ── Document RAG & Study Assistant Engine ─────────────────────────────────────
+
+@app.route('/api/rag/ask', methods=['POST'])
+def rag_ask():
+    d = request.json or {}
+    query = (d.get('query') or '').strip()
+    doc_id = d.get('document_id')
+    doc_text = (d.get('document_text') or '').strip()
+    book_title = (d.get('book_title') or 'this document').strip()
+
+    if not query:
+        return jsonify({"error": "Query required"}), 400
+
+    # Retrieve chunks from DB if indexed, or chunk provided text in real-time
+    chunks = []
+    if doc_id:
+        db_chunks = q("SELECT chunk_index, page_number, content FROM document_chunks WHERE document_id=?", (doc_id,))
+        if db_chunks:
+            chunks = rows_to_list(db_chunks)
+
+    if not chunks and doc_text:
+        chunks = rag_engine.chunk_document(doc_text)
+
+    if not chunks:
+        # Default academic knowledge corpus fallback for demo
+        fallback_corpus = f"""
+        [Page 1] Introduction to {book_title}. This academic volume covers fundamental principles, theoretical models, and practical implementations across computing and data architectures.
+        [Page 42] Normalization and Relational Modeling: Database normalization organizes relations to eliminate insertion, update, and deletion anomalies. Normal forms (1NF, 2NF, 3NF, BCNF) rely on functional dependencies.
+        [Page 88] Concurrency Control and ACID Guarantees: Relational database transactions maintain Atomicity, Consistency, Isolation, and Durability through two-phase locking (2PL) and write-ahead logging (WAL).
+        [Page 142] Distributed Consensus and Raft: Distributed systems achieve agreement among replicated state machines through leader election, log replication, and quorum majorities.
+        [Page 210] Neural Networks and Optimization: Deep learning models optimize high-dimensional objective functions using stochastic gradient descent and backpropagation with residual connections.
+        """
+        chunks = rag_engine.chunk_document(fallback_corpus)
+
+    result = rag_engine.answer_query(query, chunks, book_title=book_title)
+    return jsonify(result)
+
+@app.route('/api/rag/quiz', methods=['POST'])
+def rag_quiz():
+    d = request.json or {}
+    doc_id = d.get('document_id')
+    doc_text = (d.get('document_text') or '').strip()
+    book_title = (d.get('book_title') or 'this document').strip()
+
+    chunks = []
+    if doc_id:
+        db_chunks = q("SELECT chunk_index, page_number, content FROM document_chunks WHERE document_id=?", (doc_id,))
+        if db_chunks:
+            chunks = rows_to_list(db_chunks)
+
+    if not chunks and doc_text:
+        chunks = rag_engine.chunk_document(doc_text)
+
+    if not chunks:
+        sample_corpus = f"""
+        [Page 1] Relational models structure data in two-dimensional tables called relations.
+        [Page 2] Primary keys uniquely identify each row in a relation.
+        [Page 3] Foreign keys enforce referential integrity between related tables.
+        [Page 4] Functional dependencies determine normalization constraints.
+        [Page 5] Indexing structures like B-Trees optimize disk I/O and query lookup latency.
+        """
+        chunks = rag_engine.chunk_document(sample_corpus)
+
+    quiz = rag_engine.generate_quiz(chunks, book_title=book_title)
+    return jsonify({"quiz": quiz, "book_title": book_title})
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
     init_db()
     seed_db()
+    
+    # Non-destructive seed for courses and research papers if empty
+    db = sqlite3.connect(DB_PATH)
+    if db.execute("SELECT COUNT(*) FROM courses").fetchone()[0] == 0:
+        sample_courses = [
+            ("CS-201", "Database Management Systems", "Computer Science", 4, "Relational algebra, SQL, normalization, concurrency control, and indexing.", 4, "Dr. Robert Vance"),
+            ("CS-301", "Operating Systems & Concurrency", "Computer Science", 5, "Kernel architecture, process scheduling, memory management, and file systems.", 4, "Prof. Elena Rostova"),
+            ("CS-401", "Artificial Intelligence & Machine Learning", "Computer Science", 7, "Search algorithms, reinforcement learning, neural architectures, and semantic embeddings.", 3, "Dr. Alan Turing Jr."),
+            ("EE-205", "Digital Logic & Microprocessors", "Engineering", 3, "Combinational circuits, sequential state machines, and RISC-V CPU architecture.", 4, "Prof. Marcus Thorne"),
+            ("BA-102", "Principles of Financial Accounting", "Business", 2, "Balance sheets, ledger reconciliation, corporate cash flows, and institutional audit.", 3, "Dr. Sophia Patel")
+        ]
+        for sc in sample_courses:
+            db.execute("INSERT INTO courses(code, name, department, semester, description, credits, instructor) VALUES(?,?,?,?,?,?,?)", sc)
+        
+        # Link sample physical textbooks to courses
+        db.execute("INSERT INTO course_resources(course_id, resource_type, resource_id, is_required, notes) VALUES(1, 'book', 8, 1, 'Core Reference Textbook')") # Thinking Fast & Slow
+        db.execute("INSERT INTO course_resources(course_id, resource_type, resource_id, is_required, notes) VALUES(2, 'book', 2, 1, 'Standard Reference')") # 1984
+        db.execute("INSERT INTO course_resources(course_id, resource_type, resource_id, is_required, notes) VALUES(3, 'book', 4, 1, 'AI Principles')") # Dune
+        db.commit()
+
+    if db.execute("SELECT COUNT(*) FROM research_papers").fetchone()[0] == 0:
+        sample_papers = [
+            ("Attention Is All You Need", "Vaswani et al.", "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks. We propose the Transformer, a model architecture eschewing recurrence.", "10.48550/arXiv.1706.03762", "NeurIPS 2017", 2017, "Computer Science", "Google Research", 1420),
+            ("Spanner: Google’s Globally-Distributed Database", "Corbett et al.", "Spanner is Google's scalable, multi-version, globally-distributed, and synchronously-replicated database. It supports externally-consistent distributed transactions using TrueTime API.", "10.1145/2491245.2491247", "ACM TOCS", 2013, "Computer Science", "Google Systems", 850),
+            ("Deep Residual Learning for Image Recognition", "Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun", "Deeper neural networks are more difficult to train. We present a residual learning framework to ease the training of networks that are substantially deeper than those used previously.", "10.1109/CVPR.2016.90", "IEEE CVPR", 2016, "Computer Science", "Microsoft Research", 2100),
+            ("A Relational Model of Data for Large Shared Data Banks", "E. F. Codd", "Future users of large data banks must be protected from having to know how the data is organized in the machine. This paper introduces the relational model of data.", "10.1145/362384.362685", "Communications of the ACM", 1970, "Computer Science", "IBM Research", 4500)
+        ]
+        for sp in sample_papers:
+            db.execute("INSERT INTO research_papers(title, authors, abstract, doi, journal, publication_year, department, supervisor, citations_count) VALUES(?,?,?,?,?,?,?,?,?)", sp)
+        db.commit()
+    db.close()
+
     host = os.environ.get('HOST', '0.0.0.0')
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('DEBUG', 'true').lower() in ('true', '1', 'yes')
     app.run(host=host, port=port, debug=debug)
+

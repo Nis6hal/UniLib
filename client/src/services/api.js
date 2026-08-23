@@ -85,6 +85,45 @@ export const api = {
   // ── Monthly Circulation Reports (MCR) ──
   getMcrReport: (month) => request(`/reports/mcr${month ? `?month=${month}` : ''}`),
 
+  // ── Academic Courses & Curriculum ──
+  getCourses: (department, semester) => {
+    const params = new URLSearchParams();
+    if (department && department !== 'All') params.append('department', department);
+    if (semester && semester !== 'All') params.append('semester', semester);
+    const qs = params.toString();
+    return request(`/courses${qs ? `?${qs}` : ''}`);
+  },
+  getCourseDetail: (id) => request(`/courses/${id}`),
+  createCourse: (data) => request('/courses', { method: 'POST', body: JSON.stringify(data) }),
+  mapCourseResource: (courseId, data) => request(`/courses/${courseId}/resources`, { method: 'POST', body: JSON.stringify(data) }),
+  removeCourseResource: (mappingId) => request(`/courses/resources/${mappingId}`, { method: 'DELETE' }),
+
+  // ── Study Notes & Highlights ──
+  getAnnotations: (userId, documentId) => {
+    const params = new URLSearchParams();
+    if (userId) params.append('user_id', userId);
+    if (documentId) params.append('document_id', documentId);
+    const qs = params.toString();
+    return request(`/annotations${qs ? `?${qs}` : ''}`);
+  },
+  createAnnotation: (data) => request('/annotations', { method: 'POST', body: JSON.stringify(data) }),
+  deleteAnnotation: (id) => request(`/annotations/${id}`, { method: 'DELETE' }),
+
+  // ── Research Papers & Theses ──
+  getResearchPapers: (query, department) => {
+    const params = new URLSearchParams();
+    if (query) params.append('q', query);
+    if (department && department !== 'All') params.append('department', department);
+    const qs = params.toString();
+    return request(`/research${qs ? `?${qs}` : ''}`);
+  },
+  createResearchPaper: (data) => request('/research', { method: 'POST', body: JSON.stringify(data) }),
+  citeResearchPaper: (id) => request(`/research/${id}/cite`),
+
+  // ── Document RAG & Study Assistant ──
+  ragAsk: (data) => request('/rag/ask', { method: 'POST', body: JSON.stringify(data) }),
+  ragQuiz: (data) => request('/rag/quiz', { method: 'POST', body: JSON.stringify(data) }),
+
   // ── Analytics & System ──
   getStats: (userId) => request(`/stats${userId ? `?user_id=${userId}` : ''}`),
   getAudit: () => request('/audit'),

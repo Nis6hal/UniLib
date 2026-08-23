@@ -23,7 +23,8 @@ import {
   Coffee,
   FolderUp,
   FileCode,
-  CheckCircle2
+  CheckCircle2,
+  Bot
 } from 'lucide-react';
 
 export default function EBookReader({ currentUser }) {
@@ -34,6 +35,15 @@ export default function EBookReader({ currentUser }) {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadMode, setUploadMode] = useState('single'); // 'single' | 'folder'
   const [uploadScopeFilter, setUploadScopeFilter] = useState('all'); // 'all' | 'institutional' | 'personal'
+
+  // RAG Study Assistant & In-Reader Notes State
+  const [showRagPanel, setShowRagPanel] = useState(true);
+  const [ragTab, setRagTab] = useState('ask'); // 'ask' | 'quiz' | 'notes'
+  const [ragQuery, setRagQuery] = useState('');
+  const [ragLoading, setRagLoading] = useState(false);
+  const [ragAnswer, setRagAnswer] = useState(null);
+  const [quizData, setQuizData] = useState(null);
+  const [newNoteForm, setNewNoteForm] = useState({ page_number: 1, highlighted_text: '', note_text: '', color: '#d4af37' });
 
   // Filtered eBooks based on selected tab
   const filteredEBooks = ebooks.filter((eb) => {
@@ -67,6 +77,62 @@ export default function EBookReader({ currentUser }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const { addToast } = useToast();
+
+  const handleRagAsk = async (e) => {
+    e.preventDefault();
+    if (!ragQuery.trim()) return;
+    try {
+      setRagLoading(true);
+      const res = await api.ragAsk({
+        query: ragQuery,
+        document_id: activeReadingBook?.id,
+        book_title: activeReadingBook?.title || 'this volume'
+      });
+      setRagAnswer(res);
+    } catch (err) {
+      addToast(err.message, 'error');
+    } finally {
+      setRagLoading(false);
+    }
+  };
+
+  const handleGenerateQuiz = async () => {
+    try {
+      setRagLoading(true);
+      const res = await api.ragQuiz({
+        document_id: activeReadingBook?.id,
+        book_title: activeReadingBook?.title || 'this volume'
+      });
+      setQuizData(res.quiz);
+      addToast('5-Question Exam Quiz generated!', 'success');
+    } catch (err) {
+      addToast(err.message, 'error');
+    } finally {
+      setRagLoading(false);
+    }
+  };
+
+  const handleSaveNote = async (e) => {
+    e.preventDefault();
+    if (!currentUser?.id) {
+      addToast('Please sign in to save study notes', 'error');
+      return;
+    }
+    try {
+      await api.createAnnotation({
+        user_id: currentUser.id,
+        document_id: activeReadingBook?.id || 1,
+        page_number: newNoteForm.page_number,
+        highlighted_text: newNoteForm.highlighted_text,
+        note_text: newNoteForm.note_text,
+        color: newNoteForm.color
+      });
+      addToast('Study note saved to your Notes Hub!', 'success');
+      setNewNoteForm({ page_number: 1, highlighted_text: '', note_text: '', color: '#d4af37' });
+    } catch (err) {
+      addToast(err.message, 'error');
+    }
+  };
 
   async function load() {
     try {
@@ -577,38 +643,262 @@ export default function EBookReader({ currentUser }) {
                 >
                   <ZoomIn size={15} />
                 </button>
-
                 {/* Fullscreen Toggle */}
                 <button
                   type="button"
                   className="secondary"
                   style={{ padding: '6px 8px' }}
                   onClick={() => setIsFullscreen(!isFullscreen)}
-                  title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                  title="Toggle Fullscreen"
                 >
                   {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
                 </button>
 
-                {/* Close Button */}
+                {/* Close Reader */}
                 <button
                   type="button"
-                  className="secondary"
-                  style={{ padding: '6px 10px', color: 'var(--danger)' }}
+                  className="modal-close"
                   onClick={() => setActiveReadingBook(null)}
+                  title="Close Reader"
                 >
-                  <X size={16} />
+                  <X size={18} />
                 </button>
               </div>
             </div>
 
-            {/* Document Frame Viewport */}
-            <div className="reader-viewport">
-              <iframe
-                title={activeReadingBook.title}
-                src={api.getEBookFileUrl(activeReadingBook.id)}
-                className="reader-frame"
-                style={{ transform: `scale(${readerZoom / 100})`, transformOrigin: 'top center' }}
-              />
+            {/* Reader Content Body + Interactive RAG Study Panel */}
+            <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+              {/* Document Viewport */}
+              <div
+                className="reader-viewport"
+                style={{
+                  flex: showRagPanel ? '1 1 65%' : '1 1 100%',
+                  padding: 24,
+                  overflowY: 'auto',
+                  transition: 'flex 0.3s ease'
+                }}
+              >
+                {activeReadingBook.file_type === 'pdf' ? (
+                  <iframe
+                    src={api.getEBookFileUrl(activeReadingBook.id)}
+                    title={activeReadingBook.title}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      minHeight: '80vh',
+                      border: 'none',
+                      borderRadius: 'var(--radius-md)',
+                      transform: `scale(${readerZoom / 100})`,
+                      transformOrigin: 'top center'
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      maxWidth: 820,
+                      margin: '0 auto',
+                      padding: '30px 40px',
+                      background: readerTheme === 'dark' ? '#0d1017' : readerTheme === 'sepia' ? '#fbf0d9' : '#ffffff',
+                      color: readerTheme === 'dark' ? '#e2e8f0' : '#1e293b',
+                      borderRadius: 'var(--radius-lg)',
+                      fontSize: `${1 * (readerZoom / 100)}rem`,
+                      lineHeight: 1.8,
+                      boxShadow: 'var(--shadow-md)'
+                    }}
+                  >
+                    <h1 style={{ fontFamily: 'var(--font-display)', marginBottom: 8 }}>
+                      {activeReadingBook.title}
+                    </h1>
+                    <p style={{ color: 'var(--text-muted)', marginBottom: 24 }}>
+                      by {activeReadingBook.author} • Academic Volume
+                    </p>
+                    <hr style={{ borderColor: 'var(--border)', margin: '20px 0' }} />
+
+                    {activeReadingBook.description ? (
+                      <p>{activeReadingBook.description}</p>
+                    ) : (
+                      <p>
+                        This document has been loaded into your secure in-browser reader. You can use the RAG AI Study Assistant panel on the right to ask questions about specific chapters, generate practice quiz questions, or save personal highlights and margin notes.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* RAG Study Assistant & Notes Side Dock */}
+              <div
+                style={{
+                  width: showRagPanel ? 380 : 48,
+                  borderLeft: '1px solid var(--border)',
+                  background: '#0a0c10',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'width 0.3s ease',
+                  overflow: 'hidden'
+                }}
+              >
+                {/* Toggle Bar */}
+                <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#12151d' }}>
+                  <button
+                    className="ghost"
+                    style={{ padding: 4, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--primary)', fontWeight: 600, fontSize: '0.8rem' }}
+                    onClick={() => setShowRagPanel(!showRagPanel)}
+                  >
+                    <Bot size={18} />
+                    {showRagPanel && 'RAG Study Assistant'}
+                  </button>
+                  {showRagPanel && (
+                    <button className="modal-close" style={{ padding: 2 }} onClick={() => setShowRagPanel(false)}>
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Expanded RAG Panel */}
+                {showRagPanel && (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, overflowY: 'auto' }}>
+                    {/* RAG Sub-Tabs */}
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+                      <button
+                        type="button"
+                        className={ragTab === 'ask' ? 'btn' : 'secondary'}
+                        style={{ padding: '4px 10px', fontSize: '0.74rem', flex: 1 }}
+                        onClick={() => setRagTab('ask')}
+                      >
+                        <Sparkles size={12} /> Ask RAG
+                      </button>
+                      <button
+                        type="button"
+                        className={ragTab === 'quiz' ? 'btn' : 'secondary'}
+                        style={{ padding: '4px 10px', fontSize: '0.74rem', flex: 1 }}
+                        onClick={() => setRagTab('quiz')}
+                      >
+                        <FileCode size={12} /> Exam Quiz
+                      </button>
+                      <button
+                        type="button"
+                        className={ragTab === 'notes' ? 'btn' : 'secondary'}
+                        style={{ padding: '4px 10px', fontSize: '0.74rem', flex: 1 }}
+                        onClick={() => setRagTab('notes')}
+                      >
+                        <BookMarked size={12} /> Add Note
+                      </button>
+                    </div>
+
+                    {/* Tab 1: Ask RAG Engine */}
+                    {ragTab === 'ask' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+                        <form onSubmit={handleRagAsk} style={{ display: 'flex', gap: 8 }}>
+                          <input
+                            placeholder="Ask any question about this book..."
+                            value={ragQuery}
+                            onChange={(e) => setRagQuery(e.target.value)}
+                            style={{ flex: 1, fontSize: '0.8rem', padding: '8px 12px' }}
+                          />
+                          <button type="submit" disabled={ragLoading} style={{ padding: '8px 12px' }}>
+                            <Bot size={14} />
+                          </button>
+                        </form>
+
+                        {ragLoading && <Spinner message="Searching document chunks..." />}
+
+                        {ragAnswer && (
+                          <div style={{ background: '#12151d', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 14, fontSize: '0.82rem', lineHeight: 1.5 }}>
+                            <div style={{ color: 'var(--primary)', fontWeight: 600, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <Sparkles size={14} /> Grounded Answer:
+                            </div>
+                            <p style={{ margin: 0, whiteSpace: 'pre-line', color: 'var(--text-main)' }}>
+                              {ragAnswer.answer}
+                            </p>
+
+                            {ragAnswer.sources && ragAnswer.sources.length > 0 && (
+                              <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+                                  Verified Evidence Chunks:
+                                </span>
+                                {ragAnswer.sources.map((s, idx) => (
+                                  <div key={idx} style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: 2 }}>
+                                    • Page {s.page} (Relevance: {s.relevance})
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Tab 2: Auto-Generated Exam Practice Quiz */}
+                    {ragTab === 'quiz' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <button className="secondary" onClick={handleGenerateQuiz} disabled={ragLoading}>
+                          <Sparkles size={14} /> Generate 5-Question Exam Quiz
+                        </button>
+
+                        {ragLoading && <Spinner message="Synthesizing exam questions..." />}
+
+                        {quizData && quizData.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            {quizData.map((q, idx) => (
+                              <div key={idx} style={{ background: '#12151d', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 12 }}>
+                                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--primary)', marginBottom: 4 }}>
+                                  Q{idx + 1}. {q.question}
+                                </div>
+                                <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', padding: '6px 8px', borderRadius: 4, fontSize: '0.75rem', color: 'var(--success)', marginTop: 6 }}>
+                                  ✓ <strong>Answer:</strong> {q.options[0]}
+                                </div>
+                                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                                  {q.explanation}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Tab 3: Create Persistent Highlight / Study Note */}
+                    {ragTab === 'notes' && (
+                      <form onSubmit={handleSaveNote} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Page Number</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={newNoteForm.page_number}
+                            onChange={(e) => setNewNoteForm({ ...newNoteForm, page_number: parseInt(e.target.value) || 1 })}
+                            style={{ width: '100%', fontSize: '0.8rem', padding: '6px 10px' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Highlighted Quote / Concept</label>
+                          <textarea
+                            rows="2"
+                            placeholder="Selected passage from book..."
+                            value={newNoteForm.highlighted_text}
+                            onChange={(e) => setNewNoteForm({ ...newNoteForm, highlighted_text: e.target.value })}
+                            style={{ width: '100%', fontSize: '0.8rem', padding: '6px 10px' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>My Study Note</label>
+                          <textarea
+                            rows="3"
+                            required
+                            placeholder="Personal explanation or exam tip..."
+                            value={newNoteForm.note_text}
+                            onChange={(e) => setNewNoteForm({ ...newNoteForm, note_text: e.target.value })}
+                            style={{ width: '100%', fontSize: '0.8rem', padding: '6px 10px' }}
+                          />
+                        </div>
+                        <button type="submit">
+                          <BookMarked size={14} /> Save Note to My Hub
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

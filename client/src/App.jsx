@@ -12,6 +12,9 @@ import EBookReader from './components/EBookReader';
 import ReportsView from './components/ReportsView';
 import LandingPage from './components/LandingPage';
 import AuthModal from './components/AuthModal';
+import CourseCurriculum from './components/CourseCurriculum';
+import StudyNotesHub from './components/StudyNotesHub';
+import ResearchRepository from './components/ResearchRepository';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -57,6 +60,12 @@ export default function App() {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard currentUser={currentUser} />;
+      case 'curriculum':
+        return <CourseCurriculum currentUser={currentUser} onNavigateToBook={() => setActiveTab('books')} onNavigateToReader={() => setActiveTab('ebooks')} />;
+      case 'notes':
+        return <StudyNotesHub currentUser={currentUser} onOpenReader={() => setActiveTab('ebooks')} />;
+      case 'research':
+        return <ResearchRepository currentUser={currentUser} />;
       case 'books':
         return <BookList currentUser={currentUser} />;
       case 'ebooks':

@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   LayoutDashboard,
   BookOpen,
@@ -14,7 +13,10 @@ import {
   FileBarChart,
   LogOut,
   BellRing,
-  Globe
+  Globe,
+  GraduationCap,
+  BookMarked,
+  FileCode
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useToast } from './Toast';
@@ -26,14 +28,19 @@ export default function Layout({ activeTab, onTabChange, currentUser, onLogout, 
   const tabs = isStudent
     ? [
         { key: 'dashboard', label: 'My Dashboard', icon: LayoutDashboard, category: 'Account' },
+        { key: 'curriculum', label: 'Course Curriculum', icon: GraduationCap, category: 'Academics' },
+        { key: 'notes', label: 'My Study Notes', icon: BookMarked, category: 'Academics' },
         { key: 'books', label: 'Browse Catalog', icon: BookOpen, category: 'Library' },
         { key: 'ebooks', label: 'Digital E-Library', icon: BookOpenCheck, category: 'Library' },
+        { key: 'research', label: 'Research & Theses', icon: FileCode, category: 'Research' },
         { key: 'borrows', label: 'My Loans & Due Dates', icon: ArrowLeftRight, category: 'Circulation' },
         { key: 'reservations', label: 'My Book Holds', icon: CalendarClock, category: 'Circulation' },
         { key: 'fines', label: 'My Fines & Fees', icon: Receipt, category: 'Account' },
       ]
     : [
         { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, category: 'Core' },
+        { key: 'curriculum', label: 'Course Curriculum', icon: GraduationCap, category: 'Academics' },
+        { key: 'research', label: 'Research Repository', icon: FileCode, category: 'Research' },
         { key: 'books', label: 'Physical Catalog', icon: BookOpen, category: 'Catalog' },
         { key: 'ebooks', label: 'Digital E-Library', icon: BookOpenCheck, category: 'Catalog' },
         { key: 'members', label: 'Members Directory', icon: Users, category: 'Manage' },
