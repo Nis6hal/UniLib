@@ -71,12 +71,12 @@ export default function BookList({ currentUser }) {
 
   const handleStudentBorrow = async (bookId, title) => {
     if (!currentUser?.id) {
-      addToast('Please sign in to borrow books', 'error');
+      addToast('Please sign in to reserve books', 'error');
       return;
     }
     try {
       await api.borrowBook({ book_id: bookId, user_id: currentUser.id, days: 14 });
-      addToast(`"${title}" borrowed successfully! Due in 14 days.`, 'success');
+      addToast(`"${title}" reserved! Visit the library counter to pick it up within 3 days.`, 'success');
       if (selectedBookDrawer?.id === bookId) setSelectedBookDrawer(null);
       load();
     } catch (e) {
@@ -285,7 +285,7 @@ export default function BookList({ currentUser }) {
                           style={{ padding: '7px 14px', fontSize: '0.8rem', width: '100%' }}
                           onClick={(e) => { e.stopPropagation(); handleStudentBorrow(b.id, b.title); }}
                         >
-                          <ArrowDownLeft size={14} /> Borrow Now
+                          <CalendarClock size={14} /> Reserve / Pickup
                         </button>
                       ) : (
                         <button
@@ -377,7 +377,7 @@ export default function BookList({ currentUser }) {
                             style={{ padding: '6px 12px', fontSize: '0.78rem' }}
                             onClick={(e) => { e.stopPropagation(); handleStudentBorrow(b.id, b.title); }}
                           >
-                            <ArrowDownLeft size={13} /> Borrow
+                            <CalendarClock size={13} /> Reserve
                           </button>
                         ) : (
                           <button
@@ -469,7 +469,7 @@ export default function BookList({ currentUser }) {
                       style={{ width: '100%', padding: '14px', fontSize: '0.95rem' }}
                       onClick={() => handleStudentBorrow(selectedBookDrawer.id, selectedBookDrawer.title)}
                     >
-                      <ArrowDownLeft size={16} /> Instant Checkout / Borrow
+                      <CalendarClock size={16} /> Reserve / Request Pickup
                     </button>
                   ) : (
                     <button

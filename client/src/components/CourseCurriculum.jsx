@@ -48,6 +48,8 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
   const [folderTreeFiles, setFolderTreeFiles] = useState([]);
   const [isFolderUploading, setIsFolderUploading] = useState(false);
   const [folderUploadProgress, setFolderUploadProgress] = useState(0);
+  const [folderCourseMode, setFolderCourseMode] = useState('auto'); // 'auto' | 'existing'
+  const [selectedFolderCourseId, setSelectedFolderCourseId] = useState('');
   const folderInputRef = useRef(null);
 
   // Form states
@@ -148,11 +150,49 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
   const handleUploadFolderTree = async (e) => {
     e.preventDefault();
     if (folderTreeFiles.length === 0) return;
+
+    // If pinning to an existing course, use direct upload endpoint per file
+    if (folderCourseMode === 'existing') {
+      if (!selectedFolderCourseId) {
+        addToast('Please select a course to attach files to.', 'error');
+        return;
+      }
+      try {
+        setIsFolderUploading(true);
+        setFolderUploadProgress(5);
+        let done = 0;
+        for (const item of folderTreeFiles) {
+          const fd = new FormData();
+          fd.append('file', item.file);
+          fd.append('title', item.file.name.replace(/\.[^/.]+$/, ''));
+          fd.append('notes', 'Imported via folder upload');
+          if (currentUser?.id) fd.append('user_id', currentUser.id);
+          await api.uploadCourseResource(selectedFolderCourseId, fd);
+          done++;
+          setFolderUploadProgress(Math.round((done / folderTreeFiles.length) * 100));
+        }
+        setFolderUploadProgress(100);
+        addToast(`Uploaded ${done} files to the selected course!`, 'success');
+        setShowFolderModal(false);
+        setFolderTreeFiles([]);
+        setFolderUploadProgress(0);
+        loadCourses();
+        if (selectedCourse && parseInt(selectedFolderCourseId) === selectedCourse.id) {
+          loadCourseDetail(selectedCourse);
+        }
+      } catch (err) {
+        addToast(err.message, 'error');
+      } finally {
+        setIsFolderUploading(false);
+      }
+      return;
+    }
+
+    // Auto mode: parse folder structure and auto-create courses
     try {
       setIsFolderUploading(true);
       setFolderUploadProgress(10);
 
-      // Process in batches of 10 files to avoid hitting payload limits
       const CHUNK_SIZE = 10;
       let totalImported = 0;
       let totalCreated = 0;
@@ -489,8 +529,8 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
 
       {/* Add Course Modal */}
       {showAddModal && (
-        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => setShowAddModal(false)} style={{ alignItems: 'flex-start', paddingTop: 'clamp(16px, 5vh, 60px)' }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
             <div className="modal-header">
               <h2>Add Academic Course</h2>
               <button className="modal-close" onClick={() => setShowAddModal(false)}><X size={18} /></button>
@@ -537,8 +577,8 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
 
       {/* Link / Upload Resource Modal */}
       {showMapModal && selectedCourse && (
-        <div className="modal-overlay" onClick={() => setShowMapModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 580 }}>
+        <div className="modal-overlay" onClick={() => setShowMapModal(false)} style={{ alignItems: 'flex-start', paddingTop: 'clamp(16px, 5vh, 60px)' }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 580, maxHeight: '85vh', overflowY: 'auto' }}>
             <div className="modal-header">
               <div>
                 <h2>Add Resource to {selectedCourse.code}</h2>
@@ -669,8 +709,8 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
 
       {/* Smart Folder Tree & Subfolders Auto-Catalog Modal */}
       {showFolderModal && (
-        <div className="modal-overlay" onClick={() => setShowFolderModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
+        <div className="modal-overlay" onClick={() => setShowFolderModal(false)} style={{ alignItems: 'flex-start', paddingTop: 'clamp(16px, 5vh, 60px)' }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640, maxHeight: '85vh', overflowY: 'auto' }}>
             <div className="modal-header">
               <div>
                 <h2>Auto-Catalog Folder & Subfolders</h2>
@@ -682,8 +722,9 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
             </div>
 
             <form onSubmit={handleUploadFolderTree}>
+              {/* Step 1: Select Files */}
               <div className="form-group" style={{ marginBottom: 18 }}>
-                <label>Select Folder with Subdirectories</label>
+                <label>Step 1 — Select Folder with Files</label>
                 <input
                   ref={folderInputRef}
                   type="file"
@@ -693,8 +734,56 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
                   onChange={handleFolderSelect}
                 />
                 <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 6 }}>
-                  💡 The system reads your directory structure. For example, a folder named <code>Semester 4/Computer Networks/Ch1.pdf</code> will automatically create the subject <strong>Computer Networks</strong> in <strong>Semester 4</strong> and link the document!
+                  Select any folder from your laptop/server containing PDFs, slides or documents.
                 </p>
+              </div>
+
+              {/* Step 2: Where should these files appear? */}
+              <div className="form-group" style={{ marginBottom: 18 }}>
+                <label>Step 2 — Where should these files appear?</label>
+                <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                  <button
+                    type="button"
+                    className={folderCourseMode === 'auto' ? 'btn' : 'secondary'}
+                    style={{ flex: 1, padding: '8px 10px', fontSize: '0.8rem' }}
+                    onClick={() => setFolderCourseMode('auto')}
+                  >
+                    🗂️ Auto-detect from folder names
+                  </button>
+                  <button
+                    type="button"
+                    className={folderCourseMode === 'existing' ? 'btn' : 'secondary'}
+                    style={{ flex: 1, padding: '8px 10px', fontSize: '0.8rem' }}
+                    onClick={() => setFolderCourseMode('existing')}
+                  >
+                    📌 Add to an existing subject
+                  </button>
+                </div>
+
+                {folderCourseMode === 'auto' && (
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 8 }}>
+                    📁 Folder structure like <code>Semester 4/Computer Networks/Ch1.pdf</code> will auto-create the subject <strong>Computer Networks</strong> in <strong>Sem IV</strong>.
+                  </p>
+                )}
+
+                {folderCourseMode === 'existing' && (
+                  <div style={{ marginTop: 10 }}>
+                    <label style={{ fontSize: '0.82rem', marginBottom: 4, display: 'block' }}>Select Subject to attach all files to:</label>
+                    <select
+                      required={folderCourseMode === 'existing'}
+                      value={selectedFolderCourseId}
+                      onChange={(e) => setSelectedFolderCourseId(e.target.value)}
+                      style={{ width: '100%' }}
+                    >
+                      <option value="">-- Choose a subject --</option>
+                      {courses.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          [Sem {c.semester}] {c.code} — {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               {folderUploadProgress > 0 && (
@@ -710,7 +799,7 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
               )}
 
               {folderTreeFiles.length > 0 && (
-                <div style={{ maxHeight: 220, overflowY: 'auto', background: '#0a0c10', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 12, marginBottom: 18 }}>
+                <div style={{ maxHeight: 160, overflowY: 'auto', background: '#0a0c10', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 12, marginBottom: 18 }}>
                   <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--primary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <CheckCircle2 size={14} /> Detected {folderTreeFiles.length} files to auto-catalog:
                   </div>
