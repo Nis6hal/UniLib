@@ -264,9 +264,9 @@ def init_db():
 
     CREATE TABLE IF NOT EXISTS courses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        code TEXT UNIQUE NOT NULL,
+        code TEXT NOT NULL,
         name TEXT NOT NULL,
-        department TEXT NOT NULL,
+        department TEXT NOT NULL DEFAULT 'BE COMPUTERS',
         semester INTEGER NOT NULL DEFAULT 1,
         description TEXT,
         credits INTEGER DEFAULT 3,
@@ -1818,24 +1818,48 @@ if __name__ == '__main__':
     init_db()
     seed_db()
     
-    # Non-destructive seed for courses and research papers if empty
+    # Reset and seed strictly the official BE COMPUTERS curriculum structure
     db = sqlite3.connect(DB_PATH)
-    if db.execute("SELECT COUNT(*) FROM courses").fetchone()[0] == 0:
-        sample_courses = [
-            ("CS-201", "Database Management Systems", "Computer Science", 4, "Relational algebra, SQL, normalization, concurrency control, and indexing.", 4, "Dr. Robert Vance"),
-            ("CS-301", "Operating Systems & Concurrency", "Computer Science", 5, "Kernel architecture, process scheduling, memory management, and file systems.", 4, "Prof. Elena Rostova"),
-            ("CS-401", "Artificial Intelligence & Machine Learning", "Computer Science", 7, "Search algorithms, reinforcement learning, neural architectures, and semantic embeddings.", 3, "Dr. Alan Turing Jr."),
-            ("EE-205", "Digital Logic & Microprocessors", "Engineering", 3, "Combinational circuits, sequential state machines, and RISC-V CPU architecture.", 4, "Prof. Marcus Thorne"),
-            ("BA-102", "Principles of Financial Accounting", "Business", 2, "Balance sheets, ledger reconciliation, corporate cash flows, and institutional audit.", 3, "Dr. Sophia Patel")
-        ]
-        for sc in sample_courses:
-            db.execute("INSERT INTO courses(code, name, department, semester, description, credits, instructor) VALUES(?,?,?,?,?,?,?)", sc)
-        
-        # Link sample physical textbooks to courses
-        db.execute("INSERT INTO course_resources(course_id, resource_type, resource_id, is_required, notes) VALUES(1, 'book', 8, 1, 'Core Reference Textbook')") # Thinking Fast & Slow
-        db.execute("INSERT INTO course_resources(course_id, resource_type, resource_id, is_required, notes) VALUES(2, 'book', 2, 1, 'Standard Reference')") # 1984
-        db.execute("INSERT INTO course_resources(course_id, resource_type, resource_id, is_required, notes) VALUES(3, 'book', 4, 1, 'AI Principles')") # Dune
-        db.commit()
+    db.execute("DELETE FROM course_resources")
+    db.execute("DELETE FROM courses")
+    
+    be_computer_courses = [
+        # Year I, Semester I
+        ("MTH", "Calculus I", "BE COMPUTERS", 1, "Credit: 3 • Lecture Hours: (L: 3, T: 2, P: 0)", 3, "Faculty of Mathematics"),
+        ("ELX", "Digital Logic", "BE COMPUTERS", 1, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electronics"),
+        ("CMP", "Programming in C", "BE COMPUTERS", 1, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 3)", 3, "Faculty of Computer Engineering"),
+        ("ELE 110", "Basic Electrical Engineering", "BE COMPUTERS", 1, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electrical Engineering"),
+        ("CMP", "Computer Workshop", "BE COMPUTERS", 1, "Credit: 1 • Lecture Hours: (L: 0, T: 0, P: 3)", 1, "Faculty of Computer Engineering"),
+        ("ENG", "Communication Technique", "BE COMPUTERS", 1, "Credit: 2 • Lecture Hours: (L: 2, T: 1, P: 0)", 2, "Faculty of Humanities"),
+        ("ELX 211", "Electronics Devices and Circuits", "BE COMPUTERS", 1, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electronics"),
+
+        # Year I, Semester II
+        ("MTH", "Algebra and Geometry", "BE COMPUTERS", 2, "Credit: 3 • Lecture Hours: (L: 3, T: 2, P: 0)", 3, "Faculty of Mathematics"),
+        ("PHY", "Applied Physics", "BE COMPUTERS", 2, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Applied Sciences"),
+        ("CHM", "Applied Chemistry", "BE COMPUTERS", 2, "Credit: 2 • Lecture Hours: (L: 2, T: 1, P: 2)", 2, "Faculty of Applied Sciences"),
+        ("MEC", "Basic Engineering Drawing", "BE COMPUTERS", 2, "Credit: 1 • Lecture Hours: (L: 0, T: 0, P: 3)", 1, "Faculty of Mechanical Engineering"),
+        ("CMP 115", "Object Oriented Programming in C++", "BE COMPUTERS", 2, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 3)", 3, "Faculty of Computer Engineering"),
+        ("CMP 225", "Data Structure and Algorithm", "BE COMPUTERS", 2, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 3)", 3, "Faculty of Computer Engineering"),
+        ("ELE", "Instrumentation", "BE COMPUTERS", 2, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electrical Engineering"),
+
+        # Year II, Semester III
+        ("MTH", "Calculus II", "BE COMPUTERS", 3, "Credit: 3 • Lecture Hours: (L: 3, T: 2, P: 0)", 3, "Faculty of Mathematics"),
+        ("CMP 226", "Database Management System", "BE COMPUTERS", 3, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 3)", 3, "Faculty of Computer Engineering"),
+        ("CMP", "Operating Systems", "BE COMPUTERS", 3, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+        ("ELX", "Microprocessor and Assembly Language Programming", "BE COMPUTERS", 3, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electronics"),
+        ("CMP 241", "Computer Graphics", "BE COMPUTERS", 3, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Computer Engineering"),
+        ("CMM 340", "Data Communication", "BE COMPUTERS", 3, "Credit: 3 • Lecture Hours: (L: 3, T: 1, P: 2)", 3, "Faculty of Electronics & Comm.")
+    ]
+
+    for sc in be_computer_courses:
+        db.execute("INSERT INTO courses(code, name, department, semester, description, credits, instructor) VALUES(?,?,?,?,?,?,?)", sc)
+    
+    # Map sample reference textbooks from catalog to BE Computer courses
+    db.execute("INSERT INTO course_resources(course_id, resource_type, resource_id, is_required, notes) VALUES(16, 'book', 8, 1, 'Core Reference: Database System Concepts')") # DBMS
+    db.execute("INSERT INTO course_resources(course_id, resource_type, resource_id, is_required, notes) VALUES(17, 'book', 2, 1, 'Core Reference: Modern Operating Systems')") # OS
+    db.execute("INSERT INTO course_resources(course_id, resource_type, resource_id, is_required, notes) VALUES(13, 'book', 4, 1, 'Core Reference: Introduction to Algorithms')") # DSA
+    db.execute("INSERT INTO course_resources(course_id, resource_type, resource_id, is_required, notes) VALUES(3, 'book', 1, 1, 'Standard Textbook: C Programming Language')") # C
+    db.commit()
 
     if db.execute("SELECT COUNT(*) FROM research_papers").fetchone()[0] == 0:
         sample_papers = [

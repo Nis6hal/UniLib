@@ -137,17 +137,23 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
     }
   };
 
-  const departments = ['All', 'Computer Science', 'Engineering', 'Business', 'Mathematics', 'Physics'];
-  const semesters = ['All', '1', '2', '3', '4', '5', '6', '7', '8'];
+  const departments = ['All', 'BE COMPUTERS'];
+  const semesters = [
+    { id: 'All', label: 'All Semesters' },
+    { id: '1', label: 'Year I • Sem I' },
+    { id: '2', label: 'Year I • Sem II' },
+    { id: '3', label: 'Year II • Sem III' },
+    { id: '4', label: 'Year II • Sem IV' }
+  ];
 
   return (
     <div className="animate-in">
       {/* Section Header */}
       <div className="section-header">
         <div>
-          <h1 className="page-title">Course Curriculum & Syllabus Repository</h1>
+          <h1 className="page-title">Curriculum Structure: BE COMPUTERS</h1>
           <p className="subtitle">
-            Curated textbooks, lecture materials, and exam question papers mapped by department and semester
+            Official Bachelor of Computer Engineering curriculum with credit breakdown, L-T-P lecture hours, and linked library resources
           </p>
         </div>
 
@@ -161,7 +167,7 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
       {/* Filter Toolbar */}
       <div className="card" style={{ padding: '16px 20px', marginBottom: 24, display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
         <div>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Department</span>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Academic Program</span>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {departments.map((d) => (
               <button
@@ -178,17 +184,17 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
         </div>
 
         <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 20 }}>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Semester</span>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Semester Filter</span>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {semesters.map((s) => (
               <button
-                key={s}
+                key={s.id}
                 type="button"
-                className={selectedSem === s ? 'btn' : 'secondary'}
+                className={selectedSem === s.id ? 'btn' : 'secondary'}
                 style={{ padding: '5px 12px', fontSize: '0.78rem', borderRadius: 'var(--radius-full)' }}
-                onClick={() => setSelectedSem(s)}
+                onClick={() => setSelectedSem(s.id)}
               >
-                {s === 'All' ? 'All Sem' : `Sem ${s}`}
+                {s.label}
               </button>
             ))}
           </div>
