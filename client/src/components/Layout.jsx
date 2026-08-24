@@ -78,7 +78,12 @@ export default function Layout({ activeTab, onTabChange, currentUser, onLogout, 
     <div className="layout">
       {/* Sidebar */}
       <nav className="sidebar">
-        <div className="sidebar-header">
+        <div
+          className="sidebar-header"
+          onClick={onGoToLanding}
+          style={{ cursor: 'pointer' }}
+          title="Return to Public Landing Page"
+        >
           <div className="sidebar-brand-icon">
             <Library size={22} />
           </div>
@@ -146,12 +151,34 @@ export default function Layout({ activeTab, onTabChange, currentUser, onLogout, 
         {/* Top Sticky Header */}
         <header className="top-header no-print">
           <div className="header-left">
-            <div className="header-breadcrumb">
-              <span>UniLib</span>
-              <ChevronRight size={14} />
-              <span>{currentTabObj.category}</span>
-              <ChevronRight size={14} />
-              <span className="current">{currentTabObj.label}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button
+                type="button"
+                onClick={onGoToLanding}
+                className="ghost"
+                style={{
+                  padding: '4px 12px',
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
+                  color: 'var(--primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  border: '1px solid rgba(212, 175, 55, 0.28)',
+                  borderRadius: 'var(--radius-full)',
+                  background: 'rgba(212, 175, 55, 0.08)',
+                  cursor: 'pointer'
+                }}
+                title="Return to Public Landing Page"
+              >
+                <Library size={15} /> UniLib
+              </button>
+              <div style={{ width: 1, height: 18, background: 'rgba(255, 255, 255, 0.12)' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{currentTabObj.category}</span>
+                <ChevronRight size={13} style={{ opacity: 0.4 }} />
+                <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#fff' }}>{currentTabObj.label}</span>
+              </div>
             </div>
           </div>
 

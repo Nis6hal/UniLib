@@ -2243,7 +2243,7 @@ def rag_ask():
     if not query:
         return jsonify({"error": "Query required"}), 400
 
-    # Retrieve chunks from DB if indexed, or chunk provided text in real-time
+    # Retrieve chunks from DB if indexed, or extract from the actual book file
     chunks = []
     if doc_id:
         db_chunks = q("SELECT chunk_index, page_number, content FROM document_chunks WHERE document_id=?", (doc_id,))
@@ -2253,18 +2253,32 @@ def rag_ask():
     if not chunks and doc_text:
         chunks = rag_engine.chunk_document(doc_text)
 
+    # Real-time extraction fallback: read the actual uploaded file instead of fake corpus
+    if not chunks and doc_id:
+        book_row = q("SELECT * FROM digital_books WHERE id=?", (doc_id,), one=True)
+        if book_row:
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], book_row['file_path'])
+            content_data = get_compact_book_content(
+                book_id=doc_id,
+                file_path=file_path,
+                file_type=book_row['file_type'],
+                title=book_row['title'],
+                author=book_row['author']
+            )
+            pages = content_data.get('pages', [])
+            for p in pages:
+                text = p.get('text', '').strip()
+                if text and len(text) > 20:
+                    chunks += rag_engine.chunk_document(text, page_number=p.get('page_number', 1))
+
     if not chunks:
-        # High-caliber academic knowledge corpus fallback for interactive exploration
-        fallback_corpus = f"""
-        [Page 1] Introduction to {book_title}. This academic volume provides rigorous theoretical foundations, architectural formulations, and algorithmic implementations across computing systems, data engineering, and modern informatics.
-        [Page 18] Abstract Data Types and Graph Theory: Graph algorithms utilize adjacency matrices and sparse adjacency lists. Dijkstra's algorithm solves single-source shortest path problems with non-negative edge weights using a priority queue in O((V + E) log V) time.
-        [Page 42] Normalization and Relational Data Modeling: Database normalization decomposes relations to eliminate insertion, update, and deletion anomalies. Boyce-Codd Normal Form (BCNF) strictly requires that for every non-trivial functional dependency X -> Y, X must be a superkey.
-        [Page 88] Concurrency Control and ACID Guarantees: Relational database transactions maintain Atomicity, Consistency, Isolation, and Durability through two-phase locking (2PL) and write-ahead logging (WAL). Multi-Version Concurrency Control (MVCC) enables concurrent reads and writes without shared table locks.
-        [Page 142] Distributed Consensus and Raft Protocol: Distributed architectures achieve consistent replicated state machine transitions through leader election, log replication, and quorum majorities (N/2 + 1). Split votes are resolved via randomized election timeouts.
-        [Page 210] Neural Networks and Optimization Dynamics: Deep learning architectures optimize high-dimensional objective manifolds using stochastic gradient descent with momentum and Adam adaptive learning rates. Transformer attention mechanisms compute softmax((Q K^T) / sqrt(d_k)) V across scaled dot-product subspaces.
-        [Page 275] Operating Systems and Virtual Memory: Paging systems translate linear virtual addresses to physical frame addresses through hierarchical page tables and Translation Lookaside Buffers (TLB). Page fault handlers manage demand paging using Least Recently Used (LRU) eviction.
-        """
-        chunks = rag_engine.chunk_document(fallback_corpus)
+        result = {
+            "answer": f"### ⚠️ No Content Available\n\nThe document **\"{book_title}\"** could not be read — the file may be missing, corrupt, or in an unsupported format.\n\n**Try opening the book in the Reader tab first** to trigger content extraction, then ask your question again.",
+            "confidence": 0.0,
+            "sources": [],
+            "mode": mode
+        }
+        return jsonify(result)
 
     result = rag_engine.answer_query(query, chunks, book_title=book_title, mode=mode)
     return jsonify(result)
@@ -2285,16 +2299,25 @@ def rag_quiz():
     if not chunks and doc_text:
         chunks = rag_engine.chunk_document(doc_text)
 
+    # Real-time extraction fallback: read the actual uploaded file
+    if not chunks and doc_id:
+        book_row = q("SELECT * FROM digital_books WHERE id=?", (doc_id,), one=True)
+        if book_row:
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], book_row['file_path'])
+            content_data = get_compact_book_content(
+                book_id=doc_id,
+                file_path=file_path,
+                file_type=book_row['file_type'],
+                title=book_row['title'],
+                author=book_row['author']
+            )
+            for p in content_data.get('pages', []):
+                text = p.get('text', '').strip()
+                if text and len(text) > 20:
+                    chunks += rag_engine.chunk_document(text, page_number=p.get('page_number', 1))
+
     if not chunks:
-        sample_corpus = f"""
-        [Page 1] Relational models structure academic records into two-dimensional tables called relations.
-        [Page 2] Primary keys uniquely identify each row in a relation, enforcing entity integrity constraints.
-        [Page 3] Foreign keys enforce referential integrity between related entities across schemas.
-        [Page 4] Functional dependencies determine normalization constraints and prevent destructive redundancy.
-        [Page 5] Indexing structures like balanced B+ Trees optimize disk I/O and reduce query lookup latency from O(N) to O(log N).
-        [Page 6] Distributed transactions achieve atomicity across multiple nodes using the Two-Phase Commit (2PC) protocol.
-        """
-        chunks = rag_engine.chunk_document(sample_corpus)
+        return jsonify({"quiz": [], "book_title": book_title, "error": "Could not extract content from this document."})
 
     quiz = rag_engine.generate_quiz(chunks, book_title=book_title)
     return jsonify({"quiz": quiz, "book_title": book_title})
@@ -2315,15 +2338,25 @@ def rag_flashcards():
     if not chunks and doc_text:
         chunks = rag_engine.chunk_document(doc_text)
 
+    # Real-time extraction fallback: read the actual uploaded file
+    if not chunks and doc_id:
+        book_row = q("SELECT * FROM digital_books WHERE id=?", (doc_id,), one=True)
+        if book_row:
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], book_row['file_path'])
+            content_data = get_compact_book_content(
+                book_id=doc_id,
+                file_path=file_path,
+                file_type=book_row['file_type'],
+                title=book_row['title'],
+                author=book_row['author']
+            )
+            for p in content_data.get('pages', []):
+                text = p.get('text', '').strip()
+                if text and len(text) > 20:
+                    chunks += rag_engine.chunk_document(text, page_number=p.get('page_number', 1))
+
     if not chunks:
-        sample_corpus = f"""
-        [Page 1] Database Normalization: Normalization systematically decomposes tables to eliminate data redundancy and anomalies.
-        [Page 2] ACID Transactions: Guarantees reliability through Atomicity, Consistency, Isolation, and Durability.
-        [Page 3] B+ Tree Indexing: Self-balancing tree data structure that maintains sorted data for logarithmic searches.
-        [Page 4] Raft Consensus: Consensus algorithm designed for understandability, electing leaders via randomized heartbeats.
-        [Page 5] Vector Embeddings: Dense numerical representations capturing semantic relationships in high-dimensional vector spaces.
-        """
-        chunks = rag_engine.chunk_document(sample_corpus)
+        return jsonify({"flashcards": [], "book_title": book_title, "error": "Could not extract content from this document."})
 
     flashcards = rag_engine.generate_flashcards(chunks, book_title=book_title)
     return jsonify({"flashcards": flashcards, "book_title": book_title})

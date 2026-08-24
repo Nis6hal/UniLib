@@ -28,6 +28,7 @@ import {
   Sliders,
   ExternalLink,
   ChevronRight,
+  ChevronDown,
   Database,
   Bookmark,
   Award,
@@ -52,10 +53,6 @@ export default function LandingPage({ onOpenAuth }) {
     featured_books: []
   });
   const [loadingStats, setLoadingStats] = useState(true);
-
-  // 3D Tilt interactive book state
-  const bookCardRef = useRef(null);
-  const [bookTilt, setBookTilt] = useState({ x: 0, y: 0, isHovered: false });
 
   // Interactive Unified Search Simulation State
   const [activeSearchCategory, setActiveSearchCategory] = useState('Computer Engineering');
@@ -121,23 +118,6 @@ export default function LandingPage({ onOpenAuth }) {
     { id: 'Security', label: 'Network Security', sub: '5 Volumes • Crypto/TLS', x: 68, y: 80, color: '#ec4899' }
   ];
 
-  // Mouse move handler for 3D card tilt
-  const handleMouseMove = (e) => {
-    if (!bookCardRef.current) return;
-    const rect = bookCardRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left - rect.width / 2;
-    const y = e.clientY - rect.top - rect.height / 2;
-    setBookTilt({
-      x: -(y / (rect.height / 2)) * 14,
-      y: (x / (rect.width / 2)) * 14,
-      isHovered: true
-    });
-  };
-
-  const handleMouseLeave = () => {
-    setBookTilt({ x: 0, y: 0, isHovered: false });
-  };
-
   useEffect(() => {
     async function fetchStats() {
       try {
@@ -155,6 +135,11 @@ export default function LandingPage({ onOpenAuth }) {
 
   return (
     <div className="landing-page-vanguard">
+      {/* Fixed Majestic Library Background for Scroll-Reveal Effect */}
+      <div className="landing-hero-backdrop">
+        <div className="landing-hero-backdrop-overlay" />
+      </div>
+
       {/* Background Ambient Glow Orbs */}
       <div className="vanguard-bg-orbs">
         <div className="ambient-orb orb-gold" />
@@ -192,22 +177,47 @@ export default function LandingPage({ onOpenAuth }) {
         </div>
       </nav>
 
-      {/* Hero Section — Cinematic Center with Double-Bezel Architecture */}
-      <section className="vanguard-hero">
-        <div className="vanguard-hero-content">
+      {/* Scenic Hero Viewport — Pure Immersive Architectural View */}
+      <section className="vanguard-hero-viewport">
+        <div className="hero-viewport-content">
+          <div className="hero-atmosphere-tag">
+            <Sparkles size={13} color="var(--primary)" />
+            <span>Digital Archive & Living Academic Sanctuary</span>
+          </div>
+
+          <h1 className="hero-viewport-title">
+            UniLib
+          </h1>
+
+          <p className="hero-viewport-subline">
+            University Research Archival & Knowledge Intelligence
+          </p>
+
+          <a href="#overview" className="hero-scroll-cue">
+            <span className="scroll-cue-text">Enter Archive</span>
+            <div className="scroll-cue-bubble">
+              <ChevronDown size={15} />
+            </div>
+          </a>
+        </div>
+      </section>
+
+      {/* Section: Platform Overview, Headline, CTAs & Quick Capsules */}
+      <section id="overview" className="vanguard-overview-section">
+        <div className="vanguard-overview-content max-w-5xl mx-auto text-center">
           <div className="hero-eyebrow-pill animate-in">
             <Sparkles size={13} color="var(--primary)" />
             <span>Next-Generation University Knowledge Ecosystem</span>
           </div>
 
-          <h1 className="hero-headline-cinematic animate-in">
+          <h2 className="overview-headline-cinematic animate-in">
             The University Library, <br />
             <span className="headline-gradient-shimmer">
               Reimagined for 2026.
             </span>
-          </h1>
+          </h2>
 
-          <p className="hero-subtext-clean animate-in">
+          <p className="overview-subtext-clean animate-in">
             Unifying physical book circulation, 8-semester BE computer curriculum, peer-reviewed research papers, and hybrid RAG study intelligence.
           </p>
 
@@ -226,67 +236,45 @@ export default function LandingPage({ onOpenAuth }) {
             </a>
           </div>
 
-          {/* 3D Interactive Floating Hardcover Showcase */}
-          <div
-            className="vanguard-3d-stage animate-in"
-            ref={bookCardRef}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-          >
-            <div className="stage-glow-halo" />
-
-            {/* Orbiting Live Verified Badges */}
-            <div className="orbit-pill orbit-top-left">
-              <BookOpen size={14} color="var(--primary)" />
-              <span>Physical Titles: <strong>{liveStats.total_books}</strong></span>
-            </div>
-            <div className="orbit-pill orbit-top-right">
-              <CheckCircle2 size={14} color="var(--success)" />
-              <span>Available Copies: <strong>{liveStats.available_copies}</strong></span>
-            </div>
-            <div className="orbit-pill orbit-bottom-left">
-              <GraduationCap size={14} color="var(--info)" />
-              <span>Curriculum Courses: <strong>{liveStats.total_courses}</strong></span>
-            </div>
-            <div className="orbit-pill orbit-bottom-right">
-              <Bot size={14} color="var(--warning)" />
-              <span>Hybrid BM25 RAG Engine</span>
+          {/* Live Platform Quick Capsules Matrix */}
+          <div className="hero-capsules-grid animate-in">
+            <div className="hero-capsule-card" onClick={() => onOpenAuth('register')}>
+              <div className="capsule-icon-wrap" style={{ color: '#d4af37' }}>
+                <BookOpen size={18} />
+              </div>
+              <div className="capsule-info">
+                <span className="capsule-title">Physical Titles</span>
+                <span className="capsule-value">{liveStats.total_books} Cataloged</span>
+              </div>
             </div>
 
-            {/* Double-Bezel 3D Hardcover Book */}
-            <div
-              className="vanguard-book-card"
-              style={{
-                transform: bookTilt.isHovered
-                  ? `perspective(1000px) rotateX(${bookTilt.x}deg) rotateY(${bookTilt.y}deg) scale3d(1.03, 1.03, 1.03)`
-                  : 'perspective(1000px) rotateX(4deg) rotateY(-8deg) scale3d(1, 1, 1)'
-              }}
-              onClick={() => onOpenAuth('register')}
-              title="Click to explore and borrow in UniLib"
-            >
-              <div className="book-bezel-outer">
-                <div className="book-bezel-inner">
-                  <img
-                    src="/the_alchemist_cover.jpg"
-                    alt="The Alchemist by Paulo Coelho"
-                    className="book-art-image"
-                  />
-                  <div className="book-spine-sheen-line" />
-                  <div className="book-gold-foil-overlay">
-                    <div className="foil-header">
-                      <span className="foil-tag">Campus Favorite • Shelf A-12</span>
-                      <Sparkles size={13} color="var(--primary)" />
-                    </div>
-                    <div className="foil-body">
-                      <h3 className="foil-title">The Alchemist</h3>
-                      <p className="foil-author">Paulo Coelho • Classic Edition</p>
-                    </div>
-                    <div className="foil-footer">
-                      <span className="foil-badge-gold">Physical & Digital</span>
-                      <span className="foil-badge-live">2 Copies Ready</span>
-                    </div>
-                  </div>
-                </div>
+            <div className="hero-capsule-card" onClick={() => onOpenAuth('register')}>
+              <div className="capsule-icon-wrap" style={{ color: '#10b981' }}>
+                <CheckCircle2 size={18} />
+              </div>
+              <div className="capsule-info">
+                <span className="capsule-title">Copies on Shelf</span>
+                <span className="capsule-value">{liveStats.available_copies} Available</span>
+              </div>
+            </div>
+
+            <div className="hero-capsule-card" onClick={() => onOpenAuth('register')}>
+              <div className="capsule-icon-wrap" style={{ color: '#38bdf8' }}>
+                <GraduationCap size={18} />
+              </div>
+              <div className="capsule-info">
+                <span className="capsule-title">BE Curriculum</span>
+                <span className="capsule-value">{liveStats.total_courses} Core Courses</span>
+              </div>
+            </div>
+
+            <div className="hero-capsule-card" onClick={() => onOpenAuth('register')}>
+              <div className="capsule-icon-wrap" style={{ color: '#f59e0b' }}>
+                <Bot size={18} />
+              </div>
+              <div className="capsule-info">
+                <span className="capsule-title">Cognitive Search</span>
+                <span className="capsule-value">Hybrid BM25 RAG</span>
               </div>
             </div>
           </div>
@@ -624,10 +612,17 @@ export default function LandingPage({ onOpenAuth }) {
         </div>
       </section>
 
-      {/* Massive Cinematic Call To Action */}
+      {/* Massive Cinematic Call To Action with Grand Alcove Library Backdrop */}
       <section className="vanguard-cta-section">
-        <div className="cta-glow-backdrop" />
+        <div className="cta-backdrop-image-layer">
+          <img src="/Unilib.jpg" alt="Grand University Alcove Library" className="cta-library-backdrop-img" />
+          <div className="cta-backdrop-overlay" />
+        </div>
         <div className="cta-content-shell max-w-3xl mx-auto text-center">
+          <div className="cta-eyebrow-pill">
+            <Sparkles size={13} color="var(--primary)" />
+            <span>Preserving Centuries of Heritage • Powering 2026 Academic Intelligence</span>
+          </div>
           <h2 className="cta-headline-epic">
             Experience Higher Learning <br />
             With Living Intelligence.

@@ -90,6 +90,30 @@ export default function EBookReader({ currentUser, initialBook }) {
   const [readerTheme, setReaderTheme] = useState('dark'); // 'dark' | 'light' | 'sepia'
   const [readerZoom, setReaderZoom] = useState(100);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const readerWindowRef = useRef(null);
+
+  // True Browser HTML5 Fullscreen Engine
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      if (readerWindowRef.current?.requestFullscreen) {
+        readerWindowRef.current.requestFullscreen().catch(() => {});
+      }
+      setIsFullscreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+      setIsFullscreen(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
 
   // Compact paginated reading state
   const [bookContent, setBookContent] = useState(null);
@@ -855,6 +879,7 @@ export default function EBookReader({ currentUser, initialBook }) {
       {activeReadingBook && (
         <div className="reader-overlay" onClick={closeReader}>
           <div
+            ref={readerWindowRef}
             className={`reader-window ${readerTheme} ${isFullscreen ? 'fullscreen' : ''}`}
             onClick={(e) => e.stopPropagation()}
           >
@@ -995,10 +1020,10 @@ export default function EBookReader({ currentUser, initialBook }) {
                 {/* Fullscreen Toggle */}
                 <button
                   type="button"
-                  className="secondary"
+                  className={isFullscreen ? 'active' : 'secondary'}
                   style={{ padding: '6px 8px' }}
-                  onClick={() => setIsFullscreen(!isFullscreen)}
-                  title="Toggle Fullscreen"
+                  onClick={toggleFullscreen}
+                  title={isFullscreen ? 'Exit Fullscreen' : 'Enter True Fullscreen'}
                 >
                   {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
                 </button>
@@ -1134,14 +1159,21 @@ export default function EBookReader({ currentUser, initialBook }) {
                   <iframe
                     src={api.getEBookFileUrl(activeReadingBook.id)}
                     title={activeReadingBook.title}
+                    className="pdf-viewer-frame"
                     style={{
                       width: '100%',
                       height: '100%',
-                      minHeight: '80vh',
+                      minHeight: isFullscreen ? 'calc(100vh - 75px)' : '80vh',
                       border: 'none',
-                      borderRadius: 'var(--radius-md)',
+                      borderRadius: isFullscreen ? '0' : 'var(--radius-md)',
                       transform: `scale(${readerZoom / 100})`,
-                      transformOrigin: 'top center'
+                      transformOrigin: 'top center',
+                      filter: readerTheme === 'dark'
+                        ? 'invert(0.92) hue-rotate(180deg) contrast(0.95) brightness(0.95)'
+                        : readerTheme === 'sepia'
+                        ? 'sepia(0.42) contrast(0.94) brightness(0.96)'
+                        : 'none',
+                      backgroundColor: readerTheme === 'dark' ? '#0d1117' : readerTheme === 'sepia' ? '#fbf0d9' : '#ffffff'
                     }}
                   />
                 ) : contentLoading ? (
