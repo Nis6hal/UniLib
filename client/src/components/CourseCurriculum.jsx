@@ -335,203 +335,254 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
         )}
       </div>
 
-      {/* Filter Toolbar */}
-      <div className="card" style={{ padding: '16px 20px', marginBottom: 24, display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Academic Program</span>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {departments.map((d) => (
-              <button
-                key={d}
-                type="button"
-                className={selectedDept === d ? 'btn' : 'secondary'}
-                style={{ padding: '5px 12px', fontSize: '0.78rem', borderRadius: 'var(--radius-full)' }}
-                onClick={() => setSelectedDept(d)}
-              >
-                {d}
+      {/* If a course/subject is selected, render a Dedicated Subject Detail View */}
+      {selectedCourse && courseDetail ? (
+        <div className="animate-in">
+          {/* Back Navigation Bar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => {
+                setSelectedCourse(null);
+                setCourseDetail(null);
+              }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: '0.85rem' }}
+            >
+              <ArrowLeft size={16} /> Back to All Subjects
+            </button>
+
+            {isStaff && (
+              <button onClick={() => setShowMapModal(true)}>
+                <Plus size={15} /> Link / Upload Course Resource
               </button>
-            ))}
+            )}
           </div>
-        </div>
 
-        <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 20 }}>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Semester Filter</span>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {semesters.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                className={selectedSem === s.id ? 'btn' : 'secondary'}
-                style={{ padding: '5px 12px', fontSize: '0.78rem', borderRadius: 'var(--radius-full)' }}
-                onClick={() => setSelectedSem(s.id)}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Grid: Course List & Course Syllabus View */}
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 24, alignItems: 'start' }}>
-        {/* Left Column: Course Cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {loading && <Spinner message="Loading courses..." />}
-          {!loading && courses.length === 0 && (
-            <div className="card" style={{ textAlign: 'center', padding: 30 }}>
-              <GraduationCap size={32} color="var(--primary)" style={{ margin: '0 auto 10px' }} />
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>No courses matching filter.</p>
-            </div>
-          )}
-
-          {!loading && courses.map((c) => {
-            const isSelected = selectedCourse?.id === c.id;
-            return (
-              <div
-                key={c.id}
-                className="card"
-                style={{
-                  padding: 16,
-                  cursor: 'pointer',
-                  border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
-                  background: isSelected ? 'rgba(212, 175, 55, 0.08)' : 'var(--bg-card)',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={() => loadCourseDetail(c)}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <span className="badge-mini">{c.code}</span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Sem {c.semester} • {c.credits} Cr</span>
-                </div>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: isSelected ? 'var(--primary)' : 'var(--text-main)', margin: '4px 0' }}>
-                  {c.name}
-                </h4>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                  <span>{c.instructor || 'Faculty'}</span>
-                  <span className="badge badge-info" style={{ fontSize: '0.68rem' }}>{c.resource_count} items</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Right Column: Selected Course Syllabus & Resources */}
-        <div>
-          {detailLoading && <Spinner message="Loading curriculum resources..." />}
-          
-          {!detailLoading && selectedCourse && courseDetail && (
-            <div className="card" style={{ padding: 28 }}>
-              {/* Course Banner */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border)', paddingBottom: 18, marginBottom: 24 }}>
-                <div>
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 6 }}>
-                    <span className="badge badge-warning" style={{ fontSize: '0.8rem' }}>{courseDetail.course.code}</span>
-                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                      {courseDetail.course.department} • Semester {courseDetail.course.semester} ({courseDetail.course.credits} Credits)
-                    </span>
-                  </div>
-                  <h2 style={{ fontSize: '1.6rem', fontFamily: 'var(--font-display)', margin: 0 }}>
-                    {courseDetail.course.name}
-                  </h2>
-                  <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginTop: 6 }}>
-                    Instructor: <strong>{courseDetail.course.instructor || 'Department Faculty'}</strong>
-                  </p>
-                </div>
-
-                {isStaff && (
-                  <button className="secondary" onClick={() => setShowMapModal(true)}>
-                    <Plus size={15} /> Link Resource
-                  </button>
-                )}
-              </div>
-
-              {courseDetail.course.description && (
-                <div style={{ background: '#0a0c10', padding: 14, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: 24 }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 4 }}>
-                    Course Description & Objectives
+          <div className="card" style={{ padding: '36px 32px', marginBottom: 30 }}>
+            {/* Course Banner */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border)', paddingBottom: 22, marginBottom: 26, flexWrap: 'wrap', gap: 14 }}>
+              <div>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+                  <span className="badge badge-warning" style={{ fontSize: '0.85rem' }}>{courseDetail.course.code}</span>
+                  <span className="badge badge-info" style={{ fontSize: '0.82rem' }}>
+                    {courseDetail.course.department} • Semester {courseDetail.course.semester} ({courseDetail.course.credits} Credits)
                   </span>
-                  <p style={{ fontSize: '0.86rem', color: 'var(--text-main)', margin: 0, lineHeight: 1.5 }}>
-                    {courseDetail.course.description}
-                  </p>
+                </div>
+                <h1 style={{ fontSize: '2.1rem', fontFamily: 'var(--font-display)', margin: 0, color: 'var(--text-main)' }}>
+                  {courseDetail.course.name}
+                </h1>
+                <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', marginTop: 8 }}>
+                  Lead Course Instructor: <strong>{courseDetail.course.instructor || 'Department Faculty'}</strong>
+                </p>
+              </div>
+            </div>
+
+            {courseDetail.course.description && (
+              <div style={{ background: '#0a0c10', padding: 18, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: 28 }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 6 }}>
+                  Course Syllabus & Learning Outcomes
+                </span>
+                <p style={{ fontSize: '0.9rem', color: 'var(--text-main)', margin: 0, lineHeight: 1.6 }}>
+                  {courseDetail.course.description}
+                </p>
+              </div>
+            )}
+
+            {/* Mapped Textbooks Section */}
+            <div style={{ marginBottom: 32 }}>
+              <h3 style={{ fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <BookOpen size={19} color="var(--primary)" /> Recommended & Required Physical Textbooks
+              </h3>
+
+              {courseDetail.textbooks.length === 0 ? (
+                <div style={{ padding: '18px', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border)', color: 'var(--text-muted)', fontSize: '0.86rem' }}>
+                  No physical textbooks linked to this subject yet.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+                  {courseDetail.textbooks.map((tb) => (
+                    <div key={tb.id} style={{ background: '#12151d', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 18, display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>
+                          {tb.is_required ? 'Core Requirement' : 'Recommended'}
+                        </span>
+                        {isStaff && (
+                          <button className="ghost" style={{ padding: '2px', color: 'var(--danger)' }} onClick={() => handleRemoveResource(tb.mapping_id)}>
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                      <h4 style={{ fontSize: '0.98rem', fontWeight: 600, color: 'var(--text-main)', margin: '4px 0 2px' }}>{tb.title}</h4>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 8 }}>by {tb.author}</span>
+                      {tb.course_notes && (
+                        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', background: '#0a0c10', padding: '6px 8px', borderRadius: 4, margin: '6px 0 12px' }}>
+                          {tb.course_notes}
+                        </p>
+                      )}
+                      <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="badge badge-primary" style={{ fontSize: '0.7rem' }}>ISBN: {tb.isbn}</span>
+                        <button className="secondary" style={{ padding: '4px 10px', fontSize: '0.75rem' }} onClick={onNavigateToBook}>
+                          View in Catalog
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
+            </div>
 
-              {/* Mapped Textbooks Section */}
-              <div style={{ marginBottom: 28 }}>
-                <h3 style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                  <BookOpen size={18} color="var(--primary)" /> Required Physical Textbooks & Circulation Copies
-                </h3>
+            {/* Digital Resources / Slides / Notes Section */}
+            <div>
+              <h3 style={{ fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <BookOpenCheck size={19} color="var(--primary)" /> Digital E-Books, Lecture Notes & PDFs
+              </h3>
 
-                {courseDetail.textbooks.length === 0 ? (
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No physical textbooks linked yet.</p>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
-                    {courseDetail.textbooks.map((tb) => (
-                      <div key={tb.id} style={{ background: '#12151d', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 14, display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                          <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>
-                            {tb.is_required ? 'Core Requirement' : 'Recommended'}
-                          </span>
-                          {isStaff && (
-                            <button className="ghost" style={{ padding: '2px', color: 'var(--danger)' }} onClick={() => handleRemoveResource(tb.mapping_id)}>
-                              <X size={14} />
-                            </button>
-                          )}
-                        </div>
-                        <h4 style={{ fontSize: '0.95rem', fontWeight: 600, margin: '4px 0' }}>{tb.title}</h4>
-                        <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 10 }}>by {tb.author}</p>
-                        <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>ISBN: {tb.isbn}</span>
-                          <span className="badge badge-info" style={{ fontSize: '0.7rem' }}>Shelf Stacks</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Mapped Digital Resources & Slides Section */}
-              <div>
-                <h3 style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                  <FileText size={18} color="var(--info)" /> Digital Lecture Slides & Question Sets
-                </h3>
-
-                {courseDetail.digital_resources.length === 0 ? (
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No digital materials linked yet.</p>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
-                    {courseDetail.digital_resources.map((dr) => (
-                      <div key={dr.id} style={{ background: '#12151d', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 14, display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                          <span className="badge badge-info" style={{ fontSize: '0.7rem' }}>
-                            {dr.file_type?.toUpperCase()} Document
-                          </span>
-                          {isStaff && (
-                            <button className="ghost" style={{ padding: '2px', color: 'var(--danger)' }} onClick={() => handleRemoveResource(dr.mapping_id)}>
-                              <X size={14} />
-                            </button>
-                          )}
-                        </div>
-                        <h4 style={{ fontSize: '0.95rem', fontWeight: 600, margin: '4px 0' }}>{dr.title}</h4>
-                        <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 10 }}>by {dr.author}</p>
-                        <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                          <button
-                            type="button"
-                            onClick={() => onNavigateToReader(dr)}
-                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '0.72rem', color: 'var(--primary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                          >
-                            <BookOpen size={13} /> Read in Digital E-Library
+              {courseDetail.digital_resources.length === 0 ? (
+                <div style={{ padding: '18px', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border)', color: 'var(--text-muted)', fontSize: '0.86rem' }}>
+                  No digital lecture notes or slides attached to this subject yet.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+                  {courseDetail.digital_resources.map((dr) => (
+                    <div key={dr.id} style={{ background: '#12151d', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 18, display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span className="badge badge-info" style={{ fontSize: '0.7rem' }}>
+                          {dr.file_type?.toUpperCase() || 'PDF'} • {(dr.file_size / (1024 * 1024)).toFixed(1)} MB
+                        </span>
+                        {isStaff && (
+                          <button className="ghost" style={{ padding: '2px', color: 'var(--danger)' }} onClick={() => handleRemoveResource(dr.mapping_id)}>
+                            <X size={14} />
                           </button>
-                        </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <h4 style={{ fontSize: '0.98rem', fontWeight: 600, color: 'var(--text-main)', margin: '4px 0 2px' }}>{dr.title}</h4>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 8 }}>by {dr.author}</span>
+                      {dr.course_notes && (
+                        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', background: '#0a0c10', padding: '6px 8px', borderRadius: 4, margin: '6px 0 12px' }}>
+                          {dr.course_notes}
+                        </p>
+                      )}
+                      <div style={{ marginTop: 'auto', display: 'flex', gap: 8 }}>
+                        <button
+                          className="btn"
+                          style={{ padding: '6px 14px', fontSize: '0.78rem', flex: 1 }}
+                          onClick={() => onNavigateToReader(dr)}
+                        >
+                          <BookOpenCheck size={14} /> Open in Reader
+                        </button>
+                        <a
+                          href={api.getEBookFileUrl(dr.id)}
+                          download={dr.file_name}
+                          className="btn-secondary"
+                          style={{ padding: '6px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}
+                          title="Download Document"
+                        >
+                          <Download size={14} />
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* All Subjects Overview Grid */
+        <>
+          {/* Filter Toolbar */}
+          <div className="card" style={{ padding: '16px 20px', marginBottom: 24, display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Academic Program</span>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {departments.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    className={selectedDept === d ? 'btn' : 'secondary'}
+                    style={{ padding: '5px 12px', fontSize: '0.78rem', borderRadius: 'var(--radius-full)' }}
+                    onClick={() => setSelectedDept(d)}
+                  >
+                    {d}
+                  </button>
+                ))}
               </div>
             </div>
+
+            <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 20 }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Semester Filter</span>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {semesters.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    className={selectedSem === s.id ? 'btn' : 'secondary'}
+                    style={{ padding: '5px 12px', fontSize: '0.78rem', borderRadius: 'var(--radius-full)' }}
+                    onClick={() => setSelectedSem(s.id)}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {loading && <Spinner message="Loading courses..." />}
+
+          {!loading && courses.length === 0 && (
+            <div className="card" style={{ textAlign: 'center', padding: 40 }}>
+              <GraduationCap size={40} color="var(--primary)" style={{ margin: '0 auto 12px' }} />
+              <h3 style={{ margin: '0 0 6px' }}>No Subjects Found</h3>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>No courses matching the selected semester filter.</p>
+            </div>
           )}
-        </div>
-      </div>
+
+          {!loading && courses.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 18 }}>
+              {courses.map((c) => (
+                <div
+                  key={c.id}
+                  className="card"
+                  style={{
+                    padding: 22,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    transition: 'all 0.2s ease',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-card)'
+                  }}
+                  onClick={() => {
+                    loadCourseDetail(c);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span className="badge badge-warning" style={{ fontSize: '0.75rem' }}>{c.code}</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Sem {c.semester} • {c.credits} Cr</span>
+                  </div>
+
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', margin: '4px 0 10px' }}>
+                    {c.name}
+                  </h3>
+
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 16, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                    {c.description || 'Bachelor of Computer Engineering standard curriculum module.'}
+                  </p>
+
+                  <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{c.instructor || 'Faculty'}</span>
+                    <span className="badge badge-primary" style={{ fontSize: '0.72rem' }}>
+                      {c.resource_count} resource{c.resource_count === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
       {/* Add Course Modal */}
       {showAddModal && (

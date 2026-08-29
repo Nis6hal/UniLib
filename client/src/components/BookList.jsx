@@ -136,363 +136,386 @@ export default function BookList({ currentUser }) {
 
   return (
     <div className="animate-in">
-      {/* Section Header */}
-      <div className="section-header">
-        <div>
-          <h1 className="page-title">Physical Book Catalog</h1>
-          <p className="subtitle">
-            {isStudent
-              ? 'Browse campus library titles with high-definition covers and 1-click checkout'
-              : 'Manage physical book stock, copy inventories, and circulation availability'}
-          </p>
-        </div>
-
-        {!isStudent && (
-          <button onClick={() => setShowModal(true)}>
-            <Plus size={16} /> Add New Title
-          </button>
-        )}
-      </div>
-
-      {/* Search & Filter Toolbar */}
-      <div className="search-toolbar">
-        <form className="search-box-wrapper" onSubmit={handleSearch}>
-          <Search size={16} />
-          <input
-            type="text"
-            placeholder="Search by title, author, genre, or ISBN..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </form>
-
-        {/* View Toggle */}
-        <div className="view-toggle">
-          <button
-            type="button"
-            className={viewMode === 'grid' ? 'active' : ''}
-            onClick={() => setViewMode('grid')}
-            title="3D Grid View"
-          >
-            <LayoutGrid size={16} />
-          </button>
-          <button
-            type="button"
-            className={viewMode === 'table' ? 'active' : ''}
-            onClick={() => setViewMode('table')}
-            title="List Table View"
-          >
-            <List size={16} />
-          </button>
-        </div>
-      </div>
-
-      {/* Genre Filter Chips */}
-      {genres.length > 1 && (
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '24px' }}>
-          {genres.map((g) => (
+      {/* If a book is selected, render the dedicated Book Detail Page view */}
+      {selectedBookDrawer ? (
+        <div className="animate-in">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <button
-              key={g}
               type="button"
-              className={selectedGenre === g ? 'btn' : 'secondary'}
-              style={{ padding: '5px 14px', fontSize: '0.78rem', borderRadius: 'var(--radius-full)' }}
-              onClick={() => setSelectedGenre(g)}
+              className="secondary"
+              onClick={() => setSelectedBookDrawer(null)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: '0.85rem' }}
             >
-              {g}
+              <ArrowDownLeft size={16} style={{ transform: 'rotate(45deg)' }} /> Back to Catalog
             </button>
-          ))}
-        </div>
-      )}
 
-      {/* Skeleton Loading Shimmer */}
-      {loading && (
-        <div className="books-grid">
-          {[1, 2, 3, 4, 5, 6].map((n) => (
-            <div key={n} className="skeleton-card">
-              <div className="skeleton-shimmer" />
-            </div>
-          ))}
-        </div>
-      )}
+            <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>
+              Book Reference #{selectedBookDrawer.id}
+            </span>
+          </div>
 
-      {error && <p className="error">Error: {error}</p>}
+          <div className="card" style={{ padding: '36px 32px', marginBottom: 30 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 320px) 1fr', gap: 36, alignItems: 'start' }}>
+              {/* Cover Column */}
+              <div style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--border)', background: '#0a0c10', boxShadow: 'var(--shadow-md)' }}>
+                {selectedBookDrawer.cover_image ? (
+                  <img
+                    src={selectedBookDrawer.cover_image}
+                    alt={selectedBookDrawer.title}
+                    style={{ width: '100%', height: 'auto', maxHeight: 440, objectFit: 'cover', display: 'block' }}
+                  />
+                ) : (
+                  <div style={{
+                    height: 360,
+                    background: `linear-gradient(135deg, ${selectedBookDrawer.cover_color || '#161a22'} 0%, #0a0c10 100%)`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 12,
+                    color: 'var(--primary)'
+                  }}>
+                    <BookOpen size={64} />
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>No Cover Art Provided</span>
+                  </div>
+                )}
+              </div>
 
-      {!loading && !error && filteredBooks.length === 0 && (
-        <div className="empty-state">
-          <BookOpen className="empty-icon" />
-          <p>No titles found matching your search criteria.</p>
-        </div>
-      )}
-
-      {/* 3D Visual Grid View */}
-      {!loading && !error && filteredBooks.length > 0 && viewMode === 'grid' && (
-        <div className="books-grid">
-          {filteredBooks.map((b) => {
-            const hasCover = !!b.cover_image;
-            return (
-              <div
-                key={b.id}
-                className="book-card-3d"
-                onClick={() => setSelectedBookDrawer(b)}
-              >
-                {/* Book Cover Image Container */}
-                <div className="book-cover-container">
-                  {hasCover ? (
-                    <img src={b.cover_image} alt={b.title} className="book-cover-img" />
-                  ) : (
-                    <div style={{
-                      width: '100%',
-                      height: '100%',
-                      background: `linear-gradient(135deg, ${b.cover_color || '#161a22'} 0%, #0a0c10 100%)`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--primary)',
-                      borderBottom: '1px solid var(--border)'
-                    }}>
-                      <BookOpen size={48} />
-                    </div>
-                  )}
-
-                  <div className="book-cover-gradient-overlay" />
-
-                  <span className={`badge book-cover-badge ${b.available_copies > 0 ? 'badge-success' : 'badge-danger'}`}>
-                    {b.available_copies > 0 ? `${b.available_copies} Available` : 'Reserved Queue'}
+              {/* Information Column */}
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+                  <span className="badge badge-primary">{selectedBookDrawer.genre || 'General Academic'}</span>
+                  <span className={`badge ${selectedBookDrawer.available_copies > 0 ? 'badge-success' : 'badge-danger'}`}>
+                    {selectedBookDrawer.available_copies > 0 ? `${selectedBookDrawer.available_copies} of ${selectedBookDrawer.total_copies} Copies Available` : '0 Copies Available (Hold Queue)'}
+                  </span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                    ISBN: {selectedBookDrawer.isbn}
                   </span>
                 </div>
 
-                {/* Book Card Body */}
-                <div className="book-card-body">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <span className="book-genre-tag">{b.genre || 'General'}</span>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                      #{b.id}
-                    </span>
+                <h1 style={{ fontSize: '2.2rem', fontFamily: 'var(--font-display)', marginBottom: 8, color: 'var(--text-main)' }}>
+                  {selectedBookDrawer.title}
+                </h1>
+                <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)', marginBottom: 24 }}>
+                  Authored by <strong>{selectedBookDrawer.author}</strong>
+                </p>
+
+                <div style={{ background: '#0a0c10', padding: 20, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: 28 }}>
+                  <h4 style={{ fontSize: '0.85rem', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+                    Circulation Rules & Loan Policy
+                  </h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    <div>• Standard Loan: <strong>14 Days</strong></div>
+                    <div>• Allowed Renewals: <strong>Up to 2 Times</strong></div>
+                    <div>• Late Overdue Fine: <strong>$0.50 / day</strong></div>
+                    <div>• Hold Pickup Window: <strong>3 Days from Ready</strong></div>
                   </div>
+                </div>
 
-                  <h3 className="book-card-title" title={b.title} style={{ fontSize: '1.05rem', marginBottom: 4 }}>
-                    {b.title}
-                  </h3>
-                  <p className="book-card-author" style={{ marginBottom: 14 }}>
-                    by {b.author}
-                  </p>
-
-                  <div className="book-card-footer" style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-                    {isStudent ? (
-                      b.available_copies > 0 ? (
-                        <button
-                          className="btn"
-                          style={{ padding: '7px 14px', fontSize: '0.8rem', width: '100%' }}
-                          onClick={(e) => { e.stopPropagation(); handleStudentBorrow(b.id, b.title); }}
-                        >
-                          <CalendarClock size={14} /> Reserve / Pickup
-                        </button>
-                      ) : (
-                        <button
-                          className="secondary"
-                          style={{ padding: '7px 14px', fontSize: '0.8rem', width: '100%' }}
-                          onClick={(e) => { e.stopPropagation(); handleStudentReserve(b.id, b.title); }}
-                        >
-                          <CalendarClock size={14} /> Reserve Copy
-                        </button>
-                      )
+                <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 'auto' }}>
+                  {isStudent ? (
+                    selectedBookDrawer.available_copies > 0 ? (
+                      <button
+                        className="btn"
+                        style={{ padding: '14px 32px', fontSize: '1rem' }}
+                        onClick={() => handleStudentBorrow(selectedBookDrawer.id, selectedBookDrawer.title)}
+                      >
+                        <CalendarClock size={18} /> Reserve / Request Campus Pickup
+                      </button>
                     ) : (
-                      <>
-                        <span className="book-copies-indicator" style={{ fontSize: '0.78rem' }}>
-                          <Tag size={13} /> {b.copy_count} {b.copy_count === 1 ? 'copy' : 'copies'}
-                        </span>
-                        <button
-                          className="ghost"
-                          style={{ color: 'var(--danger)', padding: '6px' }}
-                          onClick={(e) => { e.stopPropagation(); handleDelete(b.id, b.title); }}
-                          title="Delete Book"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Table View */}
-      {!loading && !error && filteredBooks.length > 0 && viewMode === 'table' && (
-        <div className="table-responsive">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Title & Author</th>
-                <th>ISBN</th>
-                <th>Genre</th>
-                <th>Available</th>
-                {!isStudent && <th>Total Copies</th>}
-                <th style={{ textAlign: 'right' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredBooks.map((b) => (
-                <tr key={b.id} onClick={() => setSelectedBookDrawer(b)} style={{ cursor: 'pointer' }}>
-                  <td>
-                    <div className="td-title">
-                      {b.cover_image ? (
-                        <img
-                          src={b.cover_image}
-                          alt={b.title}
-                          style={{ width: 34, height: 46, objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--border)' }}
-                        />
-                      ) : (
-                        <span
-                          className="book-spine-dot"
-                          style={{ backgroundColor: b.cover_color || 'var(--primary)' }}
-                        />
-                      )}
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{b.title}</div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                          by {b.author}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="td-id">{b.isbn}</td>
-                  <td>
-                    <span className="book-genre-tag">{b.genre || '—'}</span>
-                  </td>
-                  <td>
-                    <span className={`badge ${b.available_copies > 0 ? 'badge-success' : 'badge-danger'}`}>
-                      {b.available_copies} / {b.copy_count}
-                    </span>
-                  </td>
-                  {!isStudent && <td>{b.copy_count}</td>}
-                  <td style={{ textAlign: 'right' }}>
-                    <div className="actions-cell" style={{ justifyContent: 'flex-end' }}>
-                      {isStudent ? (
-                        b.available_copies > 0 ? (
-                          <button
-                            className="btn"
-                            style={{ padding: '6px 12px', fontSize: '0.78rem' }}
-                            onClick={(e) => { e.stopPropagation(); handleStudentBorrow(b.id, b.title); }}
-                          >
-                            <CalendarClock size={13} /> Reserve
-                          </button>
-                        ) : (
-                          <button
-                            className="secondary"
-                            style={{ padding: '6px 12px', fontSize: '0.78rem' }}
-                            onClick={(e) => { e.stopPropagation(); handleStudentReserve(b.id, b.title); }}
-                          >
-                            <CalendarClock size={13} /> Reserve
-                          </button>
-                        )
-                      ) : (
-                        <button
-                          className="danger"
-                          style={{ padding: '6px 10px', fontSize: '0.78rem' }}
-                          onClick={(e) => { e.stopPropagation(); handleDelete(b.id, b.title); }}
-                        >
-                          <Trash2 size={13} /> Delete
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Slide-out Side Drawer Details Sheet */}
-      {selectedBookDrawer && (
-        <div className="drawer-overlay" onClick={() => setSelectedBookDrawer(null)}>
-          <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="drawer-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <BookMarked size={20} color="var(--primary)" />
-                <h3 style={{ margin: 0, fontSize: '1.05rem' }}>Book Details & Stock</h3>
-              </div>
-              <button className="modal-close" onClick={() => setSelectedBookDrawer(null)}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="drawer-content">
-              {/* Cover Header */}
-              {selectedBookDrawer.cover_image && (
-                <div style={{ width: '100%', height: 260, borderRadius: 'var(--radius-lg)', overflow: 'hidden', marginBottom: 20, border: '1px solid var(--border)' }}>
-                  <img src={selectedBookDrawer.cover_image} alt={selectedBookDrawer.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-              )}
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                <span className="book-genre-tag">{selectedBookDrawer.genre || 'General'}</span>
-                <span className={`badge ${selectedBookDrawer.available_copies > 0 ? 'badge-success' : 'badge-danger'}`}>
-                  {selectedBookDrawer.available_copies > 0 ? `${selectedBookDrawer.available_copies} Available` : '0 Available (Queue Active)'}
-                </span>
-              </div>
-
-              <h2 style={{ fontSize: '1.45rem', fontFamily: 'var(--font-display)', marginBottom: 4 }}>
-                {selectedBookDrawer.title}
-              </h2>
-              <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', marginBottom: 20 }}>
-                by <strong>{selectedBookDrawer.author}</strong>
-              </p>
-
-              <div className="profile-grid" style={{ marginBottom: 24 }}>
-                <div className="profile-item">
-                  <span className="profile-item-label">ISBN</span>
-                  <span className="profile-item-value" style={{ fontFamily: 'var(--font-mono)' }}>{selectedBookDrawer.isbn}</span>
-                </div>
-                <div className="profile-item">
-                  <span className="profile-item-label">Total Copies</span>
-                  <span className="profile-item-value">{selectedBookDrawer.copy_count} physical copies</span>
-                </div>
-                <div className="profile-item">
-                  <span className="profile-item-label">Hold Policy</span>
-                  <span className="profile-item-value">3-Day Pickup Window</span>
-                </div>
-                <div className="profile-item">
-                  <span className="profile-item-label">Max Loan Period</span>
-                  <span className="profile-item-value">14 Days (+2 Renews)</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {isStudent ? (
-                  selectedBookDrawer.available_copies > 0 ? (
-                    <button
-                      style={{ width: '100%', padding: '14px', fontSize: '0.95rem' }}
-                      onClick={() => handleStudentBorrow(selectedBookDrawer.id, selectedBookDrawer.title)}
-                    >
-                      <CalendarClock size={16} /> Reserve / Request Pickup
-                    </button>
+                      <button
+                        className="secondary"
+                        style={{ padding: '14px 32px', fontSize: '1rem' }}
+                        onClick={() => handleStudentReserve(selectedBookDrawer.id, selectedBookDrawer.title)}
+                      >
+                        <CalendarClock size={18} /> Place Hold / Join Waitlist
+                      </button>
+                    )
                   ) : (
                     <button
-                      className="secondary"
-                      style={{ width: '100%', padding: '14px', fontSize: '0.95rem' }}
-                      onClick={() => handleStudentReserve(selectedBookDrawer.id, selectedBookDrawer.title)}
+                      className="danger"
+                      style={{ padding: '14px 28px' }}
+                      onClick={() => handleDelete(selectedBookDrawer.id, selectedBookDrawer.title)}
                     >
-                      <CalendarClock size={16} /> Place Hold / Join Waitlist
+                      <Trash2 size={16} /> Delete Title from Catalog
                     </button>
-                  )
-                ) : (
-                  <button
-                    className="danger"
-                    style={{ width: '100%', padding: '12px' }}
-                    onClick={() => handleDelete(selectedBookDrawer.id, selectedBookDrawer.title)}
-                  >
-                    <Trash2 size={16} /> Delete Title from Catalog
-                  </button>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
+      ) : (
+        /* Regular Catalog View */
+        <>
+          {/* Section Header */}
+          <div className="section-header">
+            <div>
+              <h1 className="page-title">Physical Book Catalog</h1>
+              <p className="subtitle">
+                {isStudent
+                  ? 'Browse campus library titles with high-definition covers and 1-click checkout'
+                  : 'Manage physical book stock, copy inventories, and circulation availability'}
+              </p>
+            </div>
+
+            {!isStudent && (
+              <button onClick={() => setShowModal(true)}>
+                <Plus size={16} /> Add New Title
+              </button>
+            )}
+          </div>
+
+          {/* Search & Filter Toolbar */}
+          <div className="search-toolbar">
+            <form className="search-box-wrapper" onSubmit={handleSearch}>
+              <Search size={16} />
+              <input
+                type="text"
+                placeholder="Search by title, author, genre, or ISBN..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </form>
+
+            {/* View Toggle */}
+            <div className="view-toggle">
+              <button
+                type="button"
+                className={viewMode === 'grid' ? 'active' : ''}
+                onClick={() => setViewMode('grid')}
+                title="3D Visual Grid View"
+              >
+                <LayoutGrid size={16} />
+              </button>
+              <button
+                type="button"
+                className={viewMode === 'list' ? 'active' : ''}
+                onClick={() => setViewMode('list')}
+                title="Data Table View"
+              >
+                <List size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Genre Filter Chips */}
+          {genres.length > 1 && (
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '24px' }}>
+              {genres.map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  className={selectedGenre === g ? 'btn' : 'secondary'}
+                  style={{ padding: '5px 14px', fontSize: '0.78rem', borderRadius: 'var(--radius-full)' }}
+                  onClick={() => setSelectedGenre(g)}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Skeleton Loading Shimmer */}
+          {loading && (
+            <div className="books-grid">
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <div key={n} className="skeleton-card">
+                  <div className="skeleton-shimmer" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {error && <p className="error">Error: {error}</p>}
+
+          {!loading && !error && filteredBooks.length === 0 && (
+            <div className="empty-state">
+              <BookOpen className="empty-icon" />
+              <p>No titles found matching your search criteria.</p>
+            </div>
+          )}
+
+          {/* 3D Visual Grid View */}
+          {!loading && !error && filteredBooks.length > 0 && viewMode === 'grid' && (
+            <div className="books-grid">
+              {filteredBooks.map((b) => {
+                const hasCover = !!b.cover_image;
+                return (
+                  <div
+                    key={b.id}
+                    className="book-card-3d"
+                    onClick={() => {
+                      setSelectedBookDrawer(b);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                  >
+                    {/* Book Cover Image Container */}
+                    <div className="book-cover-container">
+                      {hasCover ? (
+                        <img src={b.cover_image} alt={b.title} className="book-cover-img" />
+                      ) : (
+                        <div style={{
+                          width: '100%',
+                          height: '100%',
+                          background: `linear-gradient(135deg, ${b.cover_color || '#161a22'} 0%, #0a0c10 100%)`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'var(--primary)',
+                          borderBottom: '1px solid var(--border)'
+                        }}>
+                          <BookOpen size={48} />
+                        </div>
+                      )}
+
+                      <div className="book-cover-gradient-overlay" />
+
+                      <span className={`badge book-cover-badge ${b.available_copies > 0 ? 'badge-success' : 'badge-danger'}`}>
+                        {b.available_copies > 0 ? `${b.available_copies} Available` : 'Reserved Queue'}
+                      </span>
+                    </div>
+
+                    {/* Book Card Body */}
+                    <div className="book-card-body">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <span className="book-genre-tag">{b.genre || 'General'}</span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                          #{b.id}
+                        </span>
+                      </div>
+
+                      <h3 className="book-card-title" title={b.title} style={{ fontSize: '1.05rem', marginBottom: 4 }}>
+                        {b.title}
+                      </h3>
+                      <p className="book-card-author" style={{ marginBottom: 14 }}>
+                        by {b.author}
+                      </p>
+
+                      <div className="book-card-footer" style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                        {isStudent ? (
+                          b.available_copies > 0 ? (
+                            <button
+                              className="btn"
+                              style={{ padding: '7px 14px', fontSize: '0.8rem', width: '100%' }}
+                              onClick={(e) => { e.stopPropagation(); handleStudentBorrow(b.id, b.title); }}
+                            >
+                              <CalendarClock size={14} /> Reserve / Pickup
+                            </button>
+                          ) : (
+                            <button
+                              className="secondary"
+                              style={{ padding: '7px 14px', fontSize: '0.8rem', width: '100%' }}
+                              onClick={(e) => { e.stopPropagation(); handleStudentReserve(b.id, b.title); }}
+                            >
+                              <CalendarClock size={14} /> Reserve Copy
+                            </button>
+                          )
+                        ) : (
+                          <div style={{ display: 'flex', gap: 6, width: '100%' }}>
+                            <button
+                              className="secondary"
+                              style={{ padding: '6px 12px', fontSize: '0.75rem', flex: 1 }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedBookDrawer(b);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                            >
+                              Details
+                            </button>
+                            <button
+                              className="danger"
+                              style={{ padding: '6px 10px', fontSize: '0.75rem' }}
+                              onClick={(e) => { e.stopPropagation(); handleDelete(b.id, b.title); }}
+                              title="Delete Title"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* List Data Table View */}
+          {!loading && !error && filteredBooks.length > 0 && viewMode === 'list' && (
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Title & Author</th>
+                    <th>ISBN</th>
+                    <th>Genre</th>
+                    <th>Available / Total</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredBooks.map((b) => (
+                    <tr
+                      key={b.id}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => {
+                        setSelectedBookDrawer(b);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                    >
+                      <td>
+                        <strong>{b.title}</strong>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{b.author}</div>
+                      </td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem' }}>{b.isbn}</td>
+                      <td>
+                        <span className="badge badge-info">{b.genre || 'General'}</span>
+                      </td>
+                      <td>
+                        <span className={`badge ${b.available_copies > 0 ? 'badge-success' : 'badge-danger'}`}>
+                          {b.available_copies} / {b.total_copies}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
+                          {isStudent ? (
+                            b.available_copies > 0 ? (
+                              <button
+                                className="btn"
+                                style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                                onClick={() => handleStudentBorrow(b.id, b.title)}
+                              >
+                                Reserve
+                              </button>
+                            ) : (
+                              <button
+                                className="secondary"
+                                style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                                onClick={() => handleStudentReserve(b.id, b.title)}
+                              >
+                                Hold
+                              </button>
+                            )
+                          ) : (
+                            <button
+                              className="danger"
+                              style={{ padding: '6px 10px', fontSize: '0.78rem' }}
+                              onClick={(e) => { e.stopPropagation(); handleDelete(b.id, b.title); }}
+                            >
+                              <Trash2 size={13} /> Delete
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
 
       {/* Add Book Modal Dialog */}
