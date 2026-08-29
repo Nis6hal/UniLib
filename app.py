@@ -12,6 +12,7 @@ from werkzeug.utils import secure_filename
 from flask import Flask, request, jsonify, send_from_directory, send_file, g
 from server.rag_engine import rag_engine
 from server.ebook_processor import get_compact_book_content
+from server.gemini_service import gemini_service
 
 # Load .env configuration if present
 env_file = os.path.join(os.path.dirname(__file__), '.env')
@@ -50,9 +51,9 @@ def send_email_notification(to_email, subject, html_content, text_content=None):
     """
     smtp_host = os.environ.get('SMTP_HOST')
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
-    smtp_user = os.environ.get('SMTP_USER')
-    smtp_pass = os.environ.get('SMTP_PASS')
-    from_email = os.environ.get('FROM_EMAIL', smtp_user or 'noreply@unilib.edu')
+    smtp_user = (os.environ.get('SMTP_USER') or '').strip()
+    smtp_pass = (os.environ.get('SMTP_PASS') or '').strip().replace(' ', '')
+    from_email = (os.environ.get('FROM_EMAIL') or smtp_user or 'noreply@unilib.edu').strip()
 
     if smtp_host and smtp_user and smtp_pass:
         try:
@@ -65,10 +66,16 @@ def send_email_notification(to_email, subject, html_content, text_content=None):
             msg.attach(MIMEText(html_content, 'html'))
 
             context = ssl.create_default_context()
-            with smtplib.SMTP(smtp_host, smtp_port) as server:
-                server.starttls(context=context)
-                server.login(smtp_user, smtp_pass)
-                server.sendmail(from_email, to_email, msg.as_string())
+            if smtp_port == 465:
+                with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context, timeout=15) as server:
+                    server.login(smtp_user, smtp_pass)
+                    server.sendmail(from_email, to_email, msg.as_string())
+            else:
+                with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+                    server.starttls(context=context)
+                    server.login(smtp_user, smtp_pass)
+                    server.sendmail(from_email, to_email, msg.as_string())
+            print(f"[SMTP SUCCESS] Dispatched email '{subject}' to {to_email}")
             return True, "Email delivered successfully via SMTP"
         except Exception as e:
             print(f"[SMTP ERROR] Failed to send email to {to_email}: {e}")
@@ -2237,7 +2244,6 @@ def create_research_paper():
 
 
 # ── Document RAG & Study Assistant Engine ─────────────────────────────────────
-
 @app.route('/api/rag/ask', methods=['POST'])
 def rag_ask():
     d = request.json or {}
@@ -2287,7 +2293,18 @@ def rag_ask():
         }
         return jsonify(result)
 
+    # 1. Try Gemini API first if configured
+    if gemini_service.is_configured():
+        try:
+            gemini_res = gemini_service.answer_query(query, chunks, book_title=book_title, mode=mode)
+            if gemini_res and gemini_res.get('answer'):
+                return jsonify(gemini_res)
+        except Exception as e:
+            print(f"[RAG GEMINI FALLBACK] Using local engine due to: {e}")
+
+    # 2. Fallback to Local Offline RAG Engine
     result = rag_engine.answer_query(query, chunks, book_title=book_title, mode=mode)
+    result["provider"] = "local_bm25"
     return jsonify(result)
 
 @app.route('/api/rag/quiz', methods=['POST'])
@@ -2326,8 +2343,18 @@ def rag_quiz():
     if not chunks:
         return jsonify({"quiz": [], "book_title": book_title, "error": "Could not extract content from this document."})
 
+    # 1. Try Gemini API first
+    if gemini_service.is_configured():
+        try:
+            gemini_quiz = gemini_service.generate_quiz(chunks, book_title=book_title)
+            if gemini_quiz and len(gemini_quiz) > 0:
+                return jsonify({"quiz": gemini_quiz, "book_title": book_title, "provider": "gemini"})
+        except Exception as e:
+            print(f"[QUIZ GEMINI FALLBACK] Using local generator due to: {e}")
+
+    # 2. Fallback to Local Bloom's Taxonomy generator
     quiz = rag_engine.generate_quiz(chunks, book_title=book_title)
-    return jsonify({"quiz": quiz, "book_title": book_title})
+    return jsonify({"quiz": quiz, "book_title": book_title, "provider": "local"})
 
 @app.route('/api/rag/flashcards', methods=['POST'])
 def rag_flashcards():
@@ -2365,8 +2392,18 @@ def rag_flashcards():
     if not chunks:
         return jsonify({"flashcards": [], "book_title": book_title, "error": "Could not extract content from this document."})
 
+    # 1. Try Gemini API first
+    if gemini_service.is_configured():
+        try:
+            gemini_cards = gemini_service.generate_flashcards(chunks, book_title=book_title)
+            if gemini_cards and len(gemini_cards) > 0:
+                return jsonify({"flashcards": gemini_cards, "book_title": book_title, "provider": "gemini"})
+        except Exception as e:
+            print(f"[FLASHCARDS GEMINI FALLBACK] Using local generator due to: {e}")
+
+    # 2. Fallback to Local Active-Recall Generator
     flashcards = rag_engine.generate_flashcards(chunks, book_title=book_title)
-    return jsonify({"flashcards": flashcards, "book_title": book_title})
+    return jsonify({"flashcards": flashcards, "book_title": book_title, "provider": "local"})
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────

@@ -1209,8 +1209,11 @@ export default function EBookReader({ currentUser, initialBook }) {
                 className="reader-viewport"
                 style={{
                   flex: showRagPanel ? '1 1 65%' : '1 1 100%',
-                  padding: 24,
-                  overflowY: 'auto',
+                  padding: readerViewMode === 'pdf' ? 0 : 24,
+                  overflowY: readerViewMode === 'pdf' ? 'hidden' : 'auto',
+                  position: 'relative',
+                  display: 'flex',
+                  flexDirection: 'column',
                   transition: 'flex 0.3s ease'
                 }}
               >
