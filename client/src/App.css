@@ -3668,3 +3668,185 @@ p.success {
   font-size: 0.75rem;
   color: var(--text-muted);
 }
+
+/* ==========================================================================
+   Comprehensive Mobile & Tablet Responsiveness System (Zero Overflows)
+   ========================================================================== */
+
+/* Universal anti-overflow safeguards */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+img, canvas, iframe, video {
+  max-width: 100%;
+}
+
+pre, code {
+  max-width: 100%;
+  overflow-x: auto;
+  word-break: break-word;
+}
+
+.table-responsive, .table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Tablet & Mobile Layout Adaptations (<= 768px) */
+@media (max-width: 768px) {
+  /* Layout & Sidebar */
+  .sidebar {
+    width: 64px;
+  }
+  
+  .sidebar-header {
+    padding: 14px 8px;
+    justify-content: center;
+  }
+
+  .sidebar-brand-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .sidebar-title,
+  .sidebar-subtitle,
+  .sidebar-nav button span:not(.sidebar-icon),
+  .nav-section-label,
+  .sidebar-footer,
+  .hide-mobile {
+    display: none !important;
+  }
+
+  .sidebar-nav {
+    padding: 12px 6px;
+    gap: 6px;
+  }
+
+  .sidebar-nav button {
+    justify-content: center;
+    padding: 10px;
+    border-radius: var(--radius-sm);
+  }
+
+  .main-content {
+    margin-left: 64px;
+    width: calc(100vw - 64px);
+    max-width: calc(100vw - 64px);
+    overflow-x: hidden;
+  }
+
+  .top-header {
+    padding: 12px 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .page-container {
+    padding: 16px 14px 40px;
+  }
+
+  /* Typography */
+  h1, .page-title {
+    font-size: 1.45rem !important;
+  }
+
+  h2 {
+    font-size: 1.2rem !important;
+  }
+
+  p.subtitle {
+    font-size: 0.82rem !important;
+  }
+
+  /* Grid systems */
+  .stats-grid,
+  .grid-2,
+  .grid-3,
+  .grid-4,
+  .features-grid,
+  .books-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+  /* Modals */
+  .modal-overlay {
+    padding: 12px;
+  }
+
+  .modal {
+    padding: 18px 16px;
+    max-height: calc(100vh - 24px);
+  }
+
+  /* Reader and Study Panel */
+  .reader-overlay {
+    padding: 0;
+  }
+
+  .reader-window {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+  }
+
+  .reader-toolbar {
+    padding: 8px 12px;
+    gap: 6px;
+  }
+
+  /* Tables */
+  .data-table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .data-table th, 
+  .data-table td {
+    padding: 10px 12px;
+    font-size: 0.78rem;
+  }
+
+  /* Forms & Filters */
+  .search-filter-bar,
+  .filter-row,
+  .section-header {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 10px;
+  }
+
+  .search-input-wrapper {
+    width: 100% !important;
+  }
+}
+
+/* Extra small devices (<= 480px) */
+@media (max-width: 480px) {
+  .sidebar {
+    width: 54px;
+  }
+
+  .main-content {
+    margin-left: 54px;
+    width: calc(100vw - 54px);
+    max-width: calc(100vw - 54px);
+  }
+
+  .page-container {
+    padding: 12px 10px 32px;
+  }
+
+  button, .btn {
+    padding: 8px 14px;
+    font-size: 0.8rem;
+  }
+}
