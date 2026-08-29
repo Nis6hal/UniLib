@@ -23,8 +23,12 @@ if os.path.exists(env_file):
                 k, v = line.split('=', 1)
                 k = k.strip()
                 v = v.strip().strip("'\"")
+                # Normalize key names (e.g. "Gemini API Key" -> "GEMINI_API_KEY")
+                norm_k = k.upper().replace(' ', '_')
                 if k not in os.environ:
                     os.environ[k] = v
+                if norm_k != k and norm_k not in os.environ:
+                    os.environ[norm_k] = v
 
 app = Flask(__name__, static_folder='client/dist', static_url_path='')
 DB_PATH = os.path.join(os.path.dirname(__file__), 'unilib.db')
@@ -485,6 +489,10 @@ def seed_db():
     ]
     for u in users:
         db.execute("INSERT INTO users(name,email,role) VALUES(?,?,?)", u)
+
+    # Ensure all seeded users have the default password (password123)
+    default_hash = generate_password_hash("password123")
+    db.execute("UPDATE users SET password_hash = ? WHERE password_hash IS NULL OR password_hash = ''", (default_hash,))
 
     books = [
         ("978-0-7432-7356-5","The Great Gatsby","F. Scott Fitzgerald","Fiction",COLORS[0]),
@@ -1359,9 +1367,8 @@ def auth_login():
         return jsonify({"error": "Account not verified", "requires_verification": True, "email": email}), 403
 
     p_hash = user['password_hash']
-    if p_hash and not check_password_hash(p_hash, password):
-        if password != "password123":
-            return jsonify({"error": "Invalid email or password"}), 401
+    if not p_hash or not check_password_hash(p_hash, password):
+        return jsonify({"error": "Invalid email or password"}), 401
 
     user_dict = dict(user)
     user_dict.pop('password_hash', None)
