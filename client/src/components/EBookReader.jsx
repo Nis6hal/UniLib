@@ -89,7 +89,7 @@ export default function EBookReader({ currentUser, initialBook }) {
   const [readerViewMode, setReaderViewMode] = useState('document'); // 'document' | 'pdf'
   const [readerTheme, setReaderTheme] = useState('dark'); // 'dark' | 'light' | 'sepia'
   const [readerZoom, setReaderZoom] = useState(100);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(true);
   const readerWindowRef = useRef(null);
 
   // True Browser HTML5 Fullscreen Engine
@@ -312,44 +312,55 @@ export default function EBookReader({ currentUser, initialBook }) {
     }
   };
 
-  const handleFolderChange = (e) => {
-    const rawFiles = Array.from(e.target.files || []);
-    const validExtensions = ['pdf', 'docx', 'epub', 'txt', 'md'];
-
-    const filtered = rawFiles.filter((f) => {
-      const ext = f.name.split('.').pop()?.toLowerCase();
-      return validExtensions.includes(ext);
-    });
-
-    const parsed = filtered.map((f) => {
-      const rawName = f.name.replace(/\.[^/.]+$/, '');
-      let author = 'University Repository';
-      let title = rawName;
-      if (rawName.includes(' - ')) {
-        const parts = rawName.split(' - ');
-        author = parts[0].trim();
-        title = parts[1].trim();
-      } else if (rawName.toLowerCase().includes(' by ')) {
-        const idx = rawName.toLowerCase().indexOf(' by ');
-        title = rawName.slice(0, idx).trim();
-        author = rawName.slice(idx + 4).trim();
-      }
-      return {
-        file: f,
-        name: f.name,
-        title: title,
-        author: author,
-        size: (f.size / (1024 * 1024)).toFixed(2),
-        ext: f.name.split('.').pop()?.toUpperCase()
-      };
-    });
-
-    setBatchFiles(parsed);
-    if (parsed.length === 0 && rawFiles.length > 0) {
-      addToast('No PDF/DOCX/EPUB documents found in selected folder', 'error');
-    } else {
-      addToast(`Detected ${parsed.length} readable document files`, 'info');
+  const parseFile = (f) => {
+    const rawName = f.name.replace(/\.[^/.]+$/, '');
+    let author = 'University Repository';
+    let title = rawName;
+    if (rawName.includes(' - ')) {
+      const parts = rawName.split(' - ');
+      author = parts[0].trim();
+      title = parts[1].trim();
+    } else if (rawName.toLowerCase().includes(' by ')) {
+      const idx = rawName.toLowerCase().indexOf(' by ');
+      title = rawName.slice(0, idx).trim();
+      author = rawName.slice(idx + 4).trim();
     }
+    const ext = (f.name.split('.').pop() || '').toLowerCase();
+    return {
+      file: f,
+      name: f.name,
+      title,
+      author,
+      size: (f.size / (1024 * 1024)).toFixed(2),
+      ext: ext.toUpperCase()
+    };
+  };
+
+  const ACCEPTED_EXT = ['pdf', 'docx', 'epub', 'txt', 'md'];
+
+  const collectFiles = (fileList) => {
+    const raw = Array.from(fileList || []);
+    const parsed = raw
+      .filter((f) => ACCEPTED_EXT.includes((f.name.split('.').pop() || '').toLowerCase()))
+      .map(parseFile);
+    if (parsed.length === 0) {
+      addToast('No supported documents found (.pdf, .docx, .epub, .txt, .md)', 'error');
+      return;
+    }
+    setBatchFiles((prev) => [...prev, ...parsed]);
+    addToast(`Added ${parsed.length} document(s) to the import queue`, 'info');
+  };
+
+  const handleFolderChange = (e) => {
+    collectFiles(e.target.files);
+  };
+
+  const handleMultiFileChange = (e) => {
+    collectFiles(e.target.files);
+  };
+
+  const removeBatchFile = (index) => {
+    setBatchFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleUploadSingle = async (e) => {
@@ -429,7 +440,6 @@ export default function EBookReader({ currentUser, initialBook }) {
   const openReader = async (book) => {
     setActiveReadingBook(book);
     setReaderZoom(100);
-    setIsFullscreen(false);
     setBookContent(null);
     setCurrentPage(1);
     setTotalPages(1);
@@ -448,6 +458,9 @@ export default function EBookReader({ currentUser, initialBook }) {
         if (res.progress && res.progress.current_page) {
           setCurrentPage(res.progress.current_page);
         }
+      }
+      if (res.book) {
+        setActiveReadingBook((prev) => ({ ...prev, ...res.book }));
       }
     } catch (err) {
       // Content extraction failed — reader will show fallback
@@ -755,10 +768,17 @@ export default function EBookReader({ currentUser, initialBook }) {
               </button>
               <button
                 type="button"
+                className={uploadMode === 'multiple' ? 'active' : ''}
+                onClick={() => setUploadMode('multiple')}
+              >
+                <Layers size={15} /> Multiple Files
+              </button>
+              <button
+                type="button"
                 className={uploadMode === 'folder' ? 'active' : ''}
                 onClick={() => setUploadMode('folder')}
               >
-                <FolderUp size={15} /> Select Entire Folder
+                <FolderUp size={15} /> Entire Folder
               </button>
             </div>
 
@@ -825,36 +845,57 @@ export default function EBookReader({ currentUser, initialBook }) {
                 </div>
               </form>
             ) : (
-              /* Entire Folder Upload */
+              /* Bulk Upload — Multiple Files or Entire Folder */
               <form onSubmit={handleUploadBatch}>
                 <div className="form-group" style={{ marginBottom: 18 }}>
-                  <label>Select Folder from Your Computer</label>
-                  <input
-                    ref={folderInputRef}
-                    type="file"
-                    webkitdirectory="true"
-                    directory="true"
-                    multiple
-                    onChange={handleFolderChange}
-                  />
+                  <label>{uploadMode === 'folder' ? 'Select Folder from Your Computer' : 'Select Multiple Documents'}</label>
+                  {uploadMode === 'folder' ? (
+                    <input
+                      ref={folderInputRef}
+                      type="file"
+                      webkitdirectory="true"
+                      directory="true"
+                      multiple
+                      onChange={handleFolderChange}
+                    />
+                  ) : (
+                    <input
+                      type="file"
+                      multiple
+                      accept=".pdf,.docx,.epub,.txt,.md"
+                      onChange={handleMultiFileChange}
+                    />
+                  )}
                   <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 6 }}>
-                    Automatically detects and indexes all .pdf, .epub, .docx, and .txt files inside the selected directory.
+                    {uploadMode === 'folder'
+                      ? 'Automatically detects and indexes all .pdf, .epub, .docx, and .txt files inside the selected directory.'
+                      : 'Hold Ctrl / Cmd to pick several files at once. Titles and authors are auto-extracted from file names (e.g. "Author - Title.pdf").'}
                   </p>
                 </div>
 
                 {batchFiles.length > 0 && (
-                  <div style={{ maxHeight: 220, overflowY: 'auto', background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 12, marginBottom: 18 }}>
-                    <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--primary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <CheckCircle2 size={14} /> Ready to Import ({batchFiles.length} files detected):
+                  <div style={{ maxHeight: 240, overflowY: 'auto', background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 12, marginBottom: 18 }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--primary)', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <CheckCircle2 size={14} /> Ready to Import ({batchFiles.length} files)
+                      </span>
+                      <button type="button" className="ghost" style={{ fontSize: '0.72rem', color: 'var(--danger)' }} onClick={() => setBatchFiles([])}>
+                        Clear all
+                      </button>
                     </div>
                     {batchFiles.map((f, i) => (
                       <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '62%' }}>
                           <strong>{f.title}</strong> <span style={{ color: 'var(--text-muted)' }}>by {f.author}</span>
                         </div>
-                        <span className="badge badge-info" style={{ fontSize: '0.7rem' }}>
-                          {f.ext} • {f.size} MB
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span className="badge badge-info" style={{ fontSize: '0.7rem' }}>
+                            {f.ext} • {f.size} MB
+                          </span>
+                          <button type="button" className="ghost" style={{ padding: 2, color: 'var(--danger)' }} onClick={() => removeBatchFile(i)} title="Remove">
+                            <X size={13} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -866,7 +907,7 @@ export default function EBookReader({ currentUser, initialBook }) {
                   </button>
                   <button type="submit" disabled={isUploading || batchFiles.length === 0}>
                     <FolderUp size={15} />
-                    {isUploading ? 'Importing Folder...' : `Import ${batchFiles.length} Books`}
+                    {isUploading ? 'Importing...' : `Import ${batchFiles.length} Book${batchFiles.length === 1 ? '' : 's'}`}
                   </button>
                 </div>
               </form>

@@ -515,7 +515,13 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
                         <h4 style={{ fontSize: '0.95rem', fontWeight: 600, margin: '4px 0' }}>{dr.title}</h4>
                         <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 10 }}>by {dr.author}</p>
                         <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                          <span style={{ fontSize: '0.72rem', color: 'var(--primary)' }}>Read in Digital E-Library</span>
+                          <button
+                            type="button"
+                            onClick={() => onNavigateToReader(dr)}
+                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '0.72rem', color: 'var(--primary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                          >
+                            <BookOpen size={13} /> Read in Digital E-Library
+                          </button>
                         </div>
                       </div>
                     ))}
