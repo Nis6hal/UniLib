@@ -2364,15 +2364,13 @@ def rag_flashcards():
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-if __name__ == '__main__':
-    init_db()
-    seed_db()
-    
-    # Reset and seed strictly the official BE COMPUTERS curriculum structure for all 8 Semesters
+def seed_curriculum():
+    """Seed the official BE COMPUTERS 8-semester curriculum (idempotent)."""
     db = sqlite3.connect(DB_PATH)
-    db.execute("DELETE FROM course_resources")
-    db.execute("DELETE FROM courses")
-    
+    if db.execute("SELECT COUNT(*) FROM courses").fetchone()[0] > 0:
+        db.close()
+        return
+
     be_computer_courses = [
         # Year I, Semester I
         ("MTH", "Calculus I", "BE COMPUTERS", 1, "Credit: 3 • Lecture Hours: (L: 3, T: 2, P: 0)", 3, "Faculty of Mathematics"),
@@ -2462,6 +2460,16 @@ if __name__ == '__main__':
         db.commit()
     db.close()
 
+
+def bootstrap():
+    """Initialize DB, seed sample data, and seed curriculum. Safe to call on startup."""
+    init_db()
+    seed_db()
+    seed_curriculum()
+
+
+if __name__ == '__main__':
+    bootstrap()
     host = os.environ.get('HOST', '0.0.0.0')
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('DEBUG', 'true').lower() in ('true', '1', 'yes')

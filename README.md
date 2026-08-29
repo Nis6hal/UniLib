@@ -21,36 +21,98 @@ No external database setup required — get running in seconds.
 - **Live Dashboard** — Real-time metrics, circulation stats, top books, and activity stream
 - **System Health Checks** — Built-in `/api/health` monitoring for uptime and DB connection status
 
-## Quick Start
+## 🚀 Running the App
+
+### Prerequisites
+
+- **Python 3.8+** — [python.org](https://www.python.org/downloads/)
+- **Node.js 18+** — [nodejs.org](https://nodejs.org/) (for the React frontend)
+
+---
+
+### 1. Install Python Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+> `requirements.txt` includes Flask and Gunicorn (Linux/macOS only). Werkzeug is installed automatically as a Flask dependency.
+
+---
+
+### 2. Configure Email (Optional)
+
+Copy `.env` and fill in your SMTP credentials to enable transactional email notifications (borrow confirmations, overdue alerts, etc.).
+
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=you@gmail.com
+SMTP_PASS=your-app-password
+FROM_EMAIL=you@gmail.com
+```
+
+> **Gmail users**: Generate an [App Password](https://myaccount.google.com/apppasswords) (requires 2-Step Verification). If `.env` is not configured, the app runs fine — emails are silently logged to the console instead.
+
+---
 
 ### Development Mode (React + Flask separately)
 
+Run the Flask backend and the Vite dev server in two terminals:
+
 ```bash
-# Terminal 1 — Start Flask API
-pip install flask
+# Terminal 1 — Flask API (http://localhost:5000)
 python app.py
 
-# Terminal 2 — Start React dev server
+# Terminal 2 — React dev server (http://localhost:3000)
 cd client
 npm install
 npm run dev
 ```
 
-Open http://localhost:3000 — the Vite dev server proxies `/api` requests to Flask on port 5000.
+The Vite dev server proxies all `/api/*` requests to Flask on port 5000. Open **http://localhost:3000** in your browser.
+
+**Shortcut** — a root-level `package.json` is included for convenience:
+
+```bash
+npm run dev      # starts the React dev server (client/)
+npm run build    # builds the React app for production (client/dist/)
+npm start        # runs python app.py
+```
+
+---
 
 ### Production Mode (Flask serves React build)
 
-```bash
-# Build the React app
-cd client
-npm run build
+Flask serves both the compiled React SPA and the API from a single process:
 
-# Start Flask (serves both API and React build)
-pip install flask
+```bash
+# 1. Build the React frontend
+cd client
+npm install
+npm run build
+cd ..
+
+# 2. Start Flask (serves /api/* + client/dist/*)
 python app.py
 ```
 
-Open http://localhost:5000.
+Open **http://localhost:5000** — no separate Node process needed.
+
+---
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `5000` | Flask server port |
+| `HOST` | `0.0.0.0` | Flask bind address |
+| `DEBUG` | `true` | Enable Flask debug mode & auto-reload |
+| `SMTP_HOST` | *(unset)* | SMTP server hostname |
+| `SMTP_PORT` | `587` | SMTP server port |
+| `SMTP_USER` | *(unset)* | SMTP login username |
+| `SMTP_PASS` | *(unset)* | SMTP login password / app password |
+| `FROM_EMAIL` | *(unset)* | Sender address shown in emails |
 
 ## 🏗️ Architecture Overview
 
@@ -133,13 +195,12 @@ fines          — id, borrow_id, amount, paid, created_at
 audit_log      — id, table_name, record_id, action, details, changed_at
 ```
 
-## Configuration & Environment Variables
+## ⚙️ App Configuration
+
+These constants can be changed directly in [`app.py`](app.py) or overridden via environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `5000` | Port for the Flask backend API server |
-| `HOST` | `0.0.0.0` | Host IP binding address |
-| `DEBUG` | `true` | Enable Flask debug mode & auto-reloading |
 | `MAX_BORROWS` | `5` | Maximum active books per member |
 | `MAX_RENEWALS` | `2` | Maximum renewal count per loan |
 | `RENEWAL_DAYS` | `14` | Loan extension period in days |
