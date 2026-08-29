@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../services/api';
 import { useToast } from './Toast';
 import Spinner from './Spinner';
+import PdfViewer from './PdfViewer';
 import {
   BookOpenCheck,
   BookOpen,
@@ -164,6 +165,15 @@ export default function EBookReader({ currentUser, initialBook }) {
       // Silently fail — not critical
     }
   }, [currentUser?.id]);
+
+  // Bridge PDF viewer progress back into UniLib (saves reading progress)
+  const handlePdfProgress = useCallback((page, total) => {
+    setCurrentPage(page);
+    setTotalPages(total);
+    if (activeReadingBook && currentUser?.id) {
+      saveProgress(activeReadingBook.id, page, total);
+    }
+  }, [activeReadingBook, currentUser?.id, saveProgress]);
 
   // Navigate to a page with auto-save
   const goToPage = useCallback((page) => {
@@ -1007,7 +1017,9 @@ export default function EBookReader({ currentUser, initialBook }) {
                   </div>
                 )}
 
-                {/* Theme Selector */}
+                {/* Theme Selector (hidden in PDF mode — PdfViewer owns theming) */}
+                {readerViewMode !== 'pdf' && (
+                  <>
                 <button
                   type="button"
                   className={readerTheme === 'dark' ? 'active' : 'secondary'}
@@ -1035,8 +1047,12 @@ export default function EBookReader({ currentUser, initialBook }) {
                 >
                   <Sun size={14} />
                 </button>
+                  </>
+                )}
 
-                {/* Zoom Controls */}
+                {/* Zoom Controls (hidden in PDF mode — PdfViewer owns zoom) */}
+                {readerViewMode !== 'pdf' && (
+                  <>
                 <button
                   type="button"
                   className="secondary"
@@ -1058,6 +1074,8 @@ export default function EBookReader({ currentUser, initialBook }) {
                 >
                   <ZoomIn size={15} />
                 </button>
+                  </>
+                )}
                 {/* Fullscreen Toggle */}
                 <button
                   type="button"
@@ -1197,25 +1215,13 @@ export default function EBookReader({ currentUser, initialBook }) {
                 }}
               >
                 {readerViewMode === 'pdf' && activeReadingBook.file_type === 'pdf' ? (
-                  <iframe
-                    src={api.getEBookFileUrl(activeReadingBook.id)}
-                    title={activeReadingBook.title}
-                    className="pdf-viewer-frame"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      minHeight: isFullscreen ? 'calc(100vh - 75px)' : '80vh',
-                      border: 'none',
-                      borderRadius: isFullscreen ? '0' : 'var(--radius-md)',
-                      transform: `scale(${readerZoom / 100})`,
-                      transformOrigin: 'top center',
-                      filter: readerTheme === 'dark'
-                        ? 'invert(0.92) hue-rotate(180deg) contrast(0.95) brightness(0.95)'
-                        : readerTheme === 'sepia'
-                        ? 'sepia(0.42) contrast(0.94) brightness(0.96)'
-                        : 'none',
-                      backgroundColor: readerTheme === 'dark' ? '#0d1117' : readerTheme === 'sepia' ? '#fbf0d9' : '#ffffff'
-                    }}
+                  <PdfViewer
+                    fileUrl={api.getEBookFileUrl(activeReadingBook.id)}
+                    bookTitle={activeReadingBook.title}
+                    initialPage={currentPage}
+                    onProgress={handlePdfProgress}
+                    onClose={closeReader}
+                    onSwitchToDocument={() => setReaderViewMode('document')}
                   />
                 ) : contentLoading ? (
                   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
