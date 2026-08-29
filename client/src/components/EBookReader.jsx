@@ -449,6 +449,7 @@ export default function EBookReader({ currentUser, initialBook }) {
 
   const openReader = async (book) => {
     setActiveReadingBook(book);
+    setReaderViewMode(book.file_type === 'pdf' ? 'pdf' : 'document');
     setReaderZoom(100);
     setBookContent(null);
     setCurrentPage(1);
@@ -1203,18 +1204,19 @@ export default function EBookReader({ currentUser, initialBook }) {
                 </div>
               )}
 
-              {/* Document Viewport */}
+              {/* Document / PDF Viewport (Full Clean Screen) */}
               <div
                 ref={readerContentRef}
                 className="reader-viewport"
                 style={{
-                  flex: showRagPanel ? '1 1 65%' : '1 1 100%',
-                  padding: readerViewMode === 'pdf' ? 0 : 24,
+                  flex: '1 1 100%',
+                  padding: readerViewMode === 'pdf' ? 0 : '30px 20px',
                   overflowY: readerViewMode === 'pdf' ? 'hidden' : 'auto',
                   position: 'relative',
                   display: 'flex',
                   flexDirection: 'column',
-                  transition: 'flex 0.3s ease'
+                  width: '100%',
+                  height: '100%'
                 }}
               >
                 {readerViewMode === 'pdf' && activeReadingBook.file_type === 'pdf' ? (
@@ -1228,22 +1230,23 @@ export default function EBookReader({ currentUser, initialBook }) {
                   />
                 ) : contentLoading ? (
                   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-                    <Spinner message="Extracting and compressing book pages..." />
+                    <Spinner message="Loading book content..." />
                   </div>
                 ) : bookContent?.pages ? (
                   /* Compact Paginated Reader — Real Extracted Content */
                   <div
                     style={{
-                      maxWidth: 820,
+                      maxWidth: 960,
+                      width: '100%',
                       margin: '0 auto',
-                      padding: '36px 44px',
+                      padding: '40px 48px',
                       background: readerTheme === 'dark' ? '#0d1017' : readerTheme === 'sepia' ? '#fbf0d9' : '#ffffff',
                       color: readerTheme === 'dark' ? '#e2e8f0' : '#1e293b',
                       borderRadius: 'var(--radius-lg)',
                       fontSize: `${fontSize}px`,
                       lineHeight: 1.85,
                       boxShadow: 'var(--shadow-md)',
-                      minHeight: 500
+                      minHeight: 600
                     }}
                   >
                     {/* Page header badge */}
@@ -1259,10 +1262,10 @@ export default function EBookReader({ currentUser, initialBook }) {
                     {/* Page title (show book title on page 1) */}
                     {currentPage === 1 && (
                       <>
-                        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.85rem', marginBottom: 6 }}>
+                        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', marginBottom: 6 }}>
                           {activeReadingBook.title}
                         </h1>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 24 }}>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginBottom: 24 }}>
                           Authored by <strong>{activeReadingBook.author}</strong> • University Repository
                         </p>
                         <hr style={{ borderColor: readerTheme === 'dark' ? 'var(--border)' : '#ccc', margin: '20px 0' }} />
@@ -1310,9 +1313,10 @@ export default function EBookReader({ currentUser, initialBook }) {
                   /* Fallback: static summary when content extraction is unavailable */
                   <div
                     style={{
-                      maxWidth: 820,
+                      maxWidth: 960,
+                      width: '100%',
                       margin: '0 auto',
-                      padding: '36px 44px',
+                      padding: '40px 48px',
                       background: readerTheme === 'dark' ? '#0d1017' : readerTheme === 'sepia' ? '#fbf0d9' : '#ffffff',
                       color: readerTheme === 'dark' ? '#e2e8f0' : '#1e293b',
                       borderRadius: 'var(--radius-lg)',
@@ -1330,309 +1334,34 @@ export default function EBookReader({ currentUser, initialBook }) {
                       </span>
                     </div>
 
-                    <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.85rem', marginBottom: 6 }}>
+                    <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', marginBottom: 6 }}>
                       {activeReadingBook.title}
                     </h1>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 24 }}>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginBottom: 24 }}>
                       Authored by <strong>{activeReadingBook.author}</strong> • University Repository
                     </p>
                     <hr style={{ borderColor: 'var(--border)', margin: '20px 0' }} />
 
                     <div style={{ marginBottom: 24 }}>
                       <h3 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: 8 }}>
-                        Executive Summary & Subject Overview
+                        Subject Overview
                       </h3>
                       <p style={{ margin: 0 }}>
-                        {activeReadingBook.description || `Comprehensive university study guide and core instructional textbook for ${activeReadingBook.title}. This volume covers formal mathematical foundations, algorithmic invariants, and production engineering practices.`}
+                        {activeReadingBook.description || `Comprehensive university study guide and core instructional textbook for ${activeReadingBook.title}.`}
                       </p>
                     </div>
 
-                    <div style={{ background: 'rgba(212,175,55,0.06)', borderLeft: '4px solid var(--primary)', padding: '14px 18px', borderRadius: '0 8px 8px 0', marginTop: 30 }}>
-                      <strong style={{ color: 'var(--primary)', display: 'block', marginBottom: 4, fontSize: '0.85rem' }}>
-                        💡 Content Extraction Note
-                      </strong>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Full page extraction is unavailable for this document. Use the PDF Frame tab to view the original file, or try downloading the document directly.
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* RAG Study Assistant & Notes Side Dock */}
-              <div
-                style={{
-                  width: showRagPanel ? 380 : 48,
-                  borderLeft: '1px solid var(--border)',
-                  background: '#0a0c10',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  transition: 'width 0.3s ease',
-                  overflow: 'hidden'
-                }}
-              >
-                {/* Toggle Bar */}
-                <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#12151d' }}>
-                  <button
-                    className="ghost"
-                    style={{ padding: 4, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--primary)', fontWeight: 600, fontSize: '0.8rem' }}
-                    onClick={() => setShowRagPanel(!showRagPanel)}
-                  >
-                    <Bot size={18} />
-                    {showRagPanel && 'RAG Study Assistant'}
-                  </button>
-                  {showRagPanel && (
-                    <button className="modal-close" style={{ padding: 2 }} onClick={() => setShowRagPanel(false)}>
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-
-                {/* Expanded Upgraded RAG Panel */}
-                {showRagPanel && (
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 14, overflowY: 'auto' }}>
-                    {/* RAG Sub-Tabs Navigation */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginBottom: 14 }}>
-                      <button
-                        type="button"
-                        className={ragTab === 'ask' ? 'btn' : 'secondary'}
-                        style={{ padding: '6px 4px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
-                        onClick={() => setRagTab('ask')}
-                      >
-                        <Sparkles size={11} /> Deep RAG
-                      </button>
-                      <button
-                        type="button"
-                        className={ragTab === 'summary' ? 'btn' : 'secondary'}
-                        style={{ padding: '6px 4px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
-                        onClick={() => setRagTab('summary')}
-                      >
-                        <Layers size={11} /> Summary
-                      </button>
-                      <button
-                        type="button"
-                        className={ragTab === 'flashcards' ? 'btn' : 'secondary'}
-                        style={{ padding: '6px 4px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
-                        onClick={() => setRagTab('flashcards')}
-                      >
-                        <BookMarked size={11} /> Flashcards
-                      </button>
-                      <button
-                        type="button"
-                        className={ragTab === 'quiz' ? 'btn' : 'secondary'}
-                        style={{ padding: '6px 4px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
-                        onClick={() => setRagTab('quiz')}
-                      >
-                        <FileCode size={11} /> Exam Quiz
-                      </button>
-                    </div>
-
-                    {/* Tab 1 & Tab 2: Ask RAG Engine / Quick Summary */}
-                    {(ragTab === 'ask' || ragTab === 'summary') && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
-                        <form onSubmit={(e) => handleRagAsk(e, ragTab === 'summary' ? 'quick_summary' : 'deep_analysis')} style={{ display: 'flex', gap: 8 }}>
-                          <input
-                            placeholder={ragTab === 'summary' ? "Enter topic for high-yield summary..." : "Ask any deep technical question..."}
-                            value={ragQuery}
-                            onChange={(e) => setRagQuery(e.target.value)}
-                            style={{ flex: 1, fontSize: '0.8rem', padding: '8px 12px' }}
-                          />
-                          <button type="submit" disabled={ragLoading} style={{ padding: '8px 12px' }}>
-                            <Bot size={14} />
-                          </button>
-                        </form>
-
-                        {ragLoading && <Spinner message="Computing BM25 & semantic evidence vectors..." />}
-
-                        {ragAnswer && (
-                          <div style={{ background: '#12151d', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 14, fontSize: '0.82rem', lineHeight: 1.6 }}>
-                            <div style={{ color: 'var(--primary)', fontWeight: 600, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <Sparkles size={14} /> {ragAnswer.mode === 'quick_summary' ? 'High-Yield Digest' : 'Grounded Academic Analysis'}
-                              </span>
-                              <span className="badge badge-success" style={{ fontSize: '0.68rem' }}>
-                                {Math.round((ragAnswer.confidence || 0.9) * 100)}% Grounded
-                              </span>
-                            </div>
-                            <p style={{ margin: 0, whiteSpace: 'pre-line', color: 'var(--text-main)' }}>
-                              {ragAnswer.answer}
-                            </p>
-
-                            {ragAnswer.sources && ragAnswer.sources.length > 0 && (
-                              <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-                                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: 6, fontWeight: 600 }}>
-                                  Verified Evidence Citations:
-                                </span>
-                                {ragAnswer.sources.map((s, idx) => (
-                                  <div key={idx} style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 4, padding: '6px 8px', marginBottom: 4 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--primary)', marginBottom: 2 }}>
-                                      <span>Page {s.page}</span>
-                                      <span>Relevance: {s.relevance}</span>
-                                    </div>
-                                    <div style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>"{s.excerpt}"</div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Tab 3: Active-Recall Study Flashcards */}
-                    {ragTab === 'flashcards' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        <button className="secondary" onClick={handleGenerateFlashcards} disabled={ragLoading} style={{ padding: '8px 12px' }}>
-                          <Sparkles size={14} /> Generate Study Flashcards
+                    {activeReadingBook.file_type === 'pdf' && (
+                      <div style={{ marginTop: 24 }}>
+                        <button
+                          type="button"
+                          className="btn"
+                          style={{ padding: '10px 20px', fontSize: '0.85rem' }}
+                          onClick={() => setReaderViewMode('pdf')}
+                        >
+                          <FileText size={16} /> Switch to Embedded PDF Viewer
                         </button>
-
-                        {ragLoading && <Spinner message="Extracting high-yield concepts..." />}
-
-                        {flashcardsData && flashcardsData.length > 0 && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            {flashcardsData.map((card) => {
-                              const isFlipped = activeFlippedCard[card.id];
-                              return (
-                                <div
-                                  key={card.id}
-                                  onClick={() => setActiveFlippedCard({ ...activeFlippedCard, [card.id]: !isFlipped })}
-                                  style={{
-                                    background: isFlipped ? '#161d28' : '#12151d',
-                                    border: `1px solid ${isFlipped ? 'var(--primary)' : 'var(--border)'}`,
-                                    borderRadius: 'var(--radius-md)',
-                                    padding: 12,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease'
-                                  }}
-                                >
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>
-                                    <span>{card.topic} • Page {card.page}</span>
-                                    <span style={{ color: 'var(--primary)' }}>{isFlipped ? '✓ Answer' : '↻ Click to flip'}</span>
-                                  </div>
-                                  <div style={{ fontSize: '0.82rem', fontWeight: isFlipped ? 400 : 600, color: isFlipped ? 'var(--text-main)' : 'var(--text-secondary)', lineHeight: 1.5 }}>
-                                    {isFlipped ? card.back : card.front}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
                       </div>
-                    )}
-
-                    {/* Tab 4: Interactive Bloom's Taxonomy Exam Practice Quiz */}
-                    {ragTab === 'quiz' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        <button className="secondary" onClick={handleGenerateQuiz} disabled={ragLoading} style={{ padding: '8px 12px' }}>
-                          <Sparkles size={14} /> Generate 5-Question Exam Quiz
-                        </button>
-
-                        {ragLoading && <Spinner message="Synthesizing Bloom's Taxonomy questions..." />}
-
-                        {quizData && quizData.length > 0 && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                            {quizData.map((q, idx) => {
-                              const selectedOpt = userQuizAnswers[idx];
-                              const isAnswered = selectedOpt !== undefined;
-                              return (
-                                <div key={idx} style={{ background: '#12151d', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 12 }}>
-                                  <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--primary)', marginBottom: 6 }}>
-                                    Q{idx + 1}. {q.question}
-                                  </div>
-
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                    {q.options.map((opt, optIdx) => {
-                                      const isCorrect = optIdx === q.correct_option_index;
-                                      const isSelected = selectedOpt === optIdx;
-                                      let optBg = 'rgba(255,255,255,0.03)';
-                                      let optBorder = 'rgba(255,255,255,0.08)';
-                                      let optColor = 'var(--text-secondary)';
-
-                                      if (isAnswered) {
-                                        if (isCorrect) {
-                                          optBg = 'rgba(16,185,129,0.12)';
-                                          optBorder = 'var(--success)';
-                                          optColor = 'var(--success)';
-                                        } else if (isSelected) {
-                                          optBg = 'rgba(244,63,94,0.12)';
-                                          optBorder = 'var(--danger)';
-                                          optColor = 'var(--danger)';
-                                        }
-                                      }
-
-                                      return (
-                                        <button
-                                          key={optIdx}
-                                          type="button"
-                                          onClick={() => !isAnswered && setUserQuizAnswers({ ...userQuizAnswers, [idx]: optIdx })}
-                                          style={{
-                                            textAlign: 'left',
-                                            padding: '8px 10px',
-                                            borderRadius: 6,
-                                            fontSize: '0.74rem',
-                                            background: optBg,
-                                            border: `1px solid ${optBorder}`,
-                                            color: optColor,
-                                            cursor: isAnswered ? 'default' : 'pointer'
-                                          }}
-                                        >
-                                          <strong>{String.fromCharCode(65 + optIdx)}.</strong> {opt}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-
-                                  {isAnswered && (
-                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 6 }}>
-                                      {q.explanation}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Tab 5: Create Persistent Highlight / Study Note */}
-                    {ragTab === 'notes' && (
-                      <form onSubmit={handleSaveNote} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        <div>
-                          <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Page Number</label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={newNoteForm.page_number}
-                            onChange={(e) => setNewNoteForm({ ...newNoteForm, page_number: parseInt(e.target.value) || 1 })}
-                            style={{ width: '100%', fontSize: '0.8rem', padding: '6px 10px' }}
-                          />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Highlighted Quote / Concept</label>
-                          <textarea
-                            rows="2"
-                            placeholder="Selected passage from book..."
-                            value={newNoteForm.highlighted_text}
-                            onChange={(e) => setNewNoteForm({ ...newNoteForm, highlighted_text: e.target.value })}
-                            style={{ width: '100%', fontSize: '0.8rem', padding: '6px 10px' }}
-                          />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>My Study Note</label>
-                          <textarea
-                            rows="3"
-                            required
-                            placeholder="Personal explanation or exam tip..."
-                            value={newNoteForm.note_text}
-                            onChange={(e) => setNewNoteForm({ ...newNoteForm, note_text: e.target.value })}
-                            style={{ width: '100%', fontSize: '0.8rem', padding: '6px 10px' }}
-                          />
-                        </div>
-                        <button type="submit">
-                          <BookMarked size={14} /> Save Note to My Hub
-                        </button>
-                      </form>
                     )}
                   </div>
                 )}
