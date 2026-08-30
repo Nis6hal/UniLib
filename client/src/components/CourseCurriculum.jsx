@@ -5,10 +5,13 @@ import Spinner from './Spinner';
 import {
   GraduationCap,
   BookOpen,
+  BookOpenCheck,
   FileText,
   FileCode,
   Plus,
+  ArrowLeft,
   ArrowRight,
+  Download,
   Layers,
   Sparkles,
   ChevronRight,
