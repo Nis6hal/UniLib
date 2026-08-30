@@ -3697,6 +3697,11 @@ pre, code {
 
 /* Tablet & Mobile Layout Adaptations (<= 768px) */
 @media (max-width: 768px) {
+  /* Hide "Explore Library" button from landing nav on mobile — overlaps section title */
+  .nav-btn-primary {
+    display: none !important;
+  }
+
   /* Layout & Sidebar */
   .sidebar {
     width: 64px;
