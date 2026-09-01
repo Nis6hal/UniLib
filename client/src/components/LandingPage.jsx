@@ -151,6 +151,36 @@ export default function LandingPage({ onOpenAuth }) {
     }
   };
 
+  // Mouse position tracking for 3D Tilt & Spotlight Glow
+  const [tiltStyle, setTiltStyle] = useState({ transform: 'rotateX(0deg) rotateY(0deg)' });
+
+  const handleCardMouseMove = (e) => {
+    const card = e.currentTarget;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Set CSS variables for radial spotlight
+    card.style.setProperty('--mouse-x', `${x}px`);
+    card.style.setProperty('--mouse-y', `${y}px`);
+
+    // Calculate 3D tilt
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const rotateX = ((y - centerY) / centerY) * -10;
+    const rotateY = ((x - centerX) / centerX) * 12;
+
+    setTiltStyle({
+      transform: `perspective(1000px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) scale3d(1.02, 1.02, 1.02)`
+    });
+  };
+
+  const handleCardMouseLeave = (e) => {
+    setTiltStyle({
+      transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)'
+    });
+  };
+
   return (
     <div className="landing-page-vanguard">
       {/* Fixed Ambient Library Background Layer */}
@@ -195,77 +225,134 @@ export default function LandingPage({ onOpenAuth }) {
         </div>
       </nav>
 
-      {/* 1. Unified Focused Hero Viewport (Min-Height 100dvh, High Conversion, Value in 20 Words) */}
-      <section className="vanguard-hero-viewport" style={{ minHeight: '100dvh', justifyContent: 'center', paddingTop: '100px' }}>
-        <div className="hero-viewport-content" style={{ maxWidth: '940px' }}>
-          <div className="hero-atmosphere-tag">
-            <Sparkles size={13} color="var(--primary)" />
-            <span>Digital Archive & Living Academic Sanctuary</span>
+      {/* 1. 50/50 Split Hero Viewport (High Conversion Left + Interactive 3D Showcase Right) */}
+      <section className="vanguard-hero-viewport">
+        <div className="hero-split-container">
+          {/* Left Column: Focused Copy & Value Prop */}
+          <div className="hero-left-column">
+            <div className="hero-atmosphere-tag">
+              <Sparkles size={13} color="var(--primary)" />
+              <span>Digital Archive & Living Academic Sanctuary</span>
+            </div>
+
+            <h1 className="hero-viewport-title">
+              The University Library, <br />
+              <span className="headline-gradient-shimmer">Reimagined for 2026.</span>
+            </h1>
+
+            <p className="hero-viewport-subline">
+              Unifying physical book circulation, 8-semester BE computer curriculum, peer-reviewed research papers, and hybrid RAG study intelligence.
+            </p>
+
+            <div className="hero-cta-group">
+              <button className="vanguard-cta-primary" onClick={() => onOpenAuth('register')}>
+                <span>Access Library Portal</span>
+                <div className="btn-nested-icon">
+                  <ArrowRight size={16} />
+                </div>
+              </button>
+              <a href="#discovery" className="vanguard-cta-secondary">
+                <span>View Live Catalog</span>
+                <div className="btn-nested-icon-secondary">
+                  <Compass size={15} />
+                </div>
+              </a>
+            </div>
+
+            {/* Quick Metrics Matrix */}
+            <div className="hero-capsules-grid">
+              <div className="hero-capsule-card spotlight-card" onClick={() => onOpenAuth('register')}>
+                <div className="capsule-icon-wrap" style={{ color: '#d4af37' }}>
+                  <BookOpen size={18} />
+                </div>
+                <div className="capsule-info">
+                  <span className="capsule-title">Physical Titles</span>
+                  <span className="capsule-value">{liveStats.total_books} Cataloged</span>
+                </div>
+              </div>
+
+              <div className="hero-capsule-card spotlight-card" onClick={() => onOpenAuth('register')}>
+                <div className="capsule-icon-wrap" style={{ color: '#10b981' }}>
+                  <CheckCircle2 size={18} />
+                </div>
+                <div className="capsule-info">
+                  <span className="capsule-title">On Shelf</span>
+                  <span className="capsule-value">{liveStats.available_copies} Ready</span>
+                </div>
+              </div>
+
+              <div className="hero-capsule-card spotlight-card" onClick={() => onOpenAuth('register')}>
+                <div className="capsule-icon-wrap" style={{ color: '#38bdf8' }}>
+                  <GraduationCap size={18} />
+                </div>
+                <div className="capsule-info">
+                  <span className="capsule-title">Curriculum</span>
+                  <span className="capsule-value">{liveStats.total_courses} BE Courses</span>
+                </div>
+              </div>
+
+              <div className="hero-capsule-card spotlight-card" onClick={() => onOpenAuth('register')}>
+                <div className="capsule-icon-wrap" style={{ color: '#f59e0b' }}>
+                  <Bot size={18} />
+                </div>
+                <div className="capsule-info">
+                  <span className="capsule-title">Study AI</span>
+                  <span className="capsule-value">Hybrid RAG</span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <h1 className="hero-viewport-title" style={{ fontSize: 'clamp(2.6rem, 5.5vw, 4.4rem)', lineHeight: 1.12, marginBottom: 14 }}>
-            The University Library, <br />
-            <span className="headline-gradient-shimmer">Reimagined for 2026.</span>
-          </h1>
+          {/* Right Column: 3D Interactive Spotlight Tilt Card */}
+          <div className="hero-3d-stage">
+            <div
+              className="showcase-3d-card spotlight-card"
+              style={tiltStyle}
+              onMouseMove={handleCardMouseMove}
+              onMouseLeave={handleCardMouseLeave}
+            >
+              <div className="showcase-float-badge">
+                <ShieldCheck size={12} color="var(--success)" /> Verified Archival Grounding
+              </div>
 
-          <p className="hero-viewport-subline" style={{ maxWidth: '640px', fontSize: '1.05rem', lineHeight: 1.6, color: 'var(--text-secondary)', marginBottom: 28 }}>
-            Unifying physical book circulation, 8-semester BE computer curriculum, peer-reviewed research papers, and hybrid RAG study intelligence.
-          </p>
+              <div className="showcase-book-spine">
+                <div className="showcase-cover-art">
+                  <span style={{ fontSize: '0.62rem', color: 'var(--primary)', fontWeight: 700, textTransform: 'uppercase' }}>Core Volume</span>
+                  <BookMarked size={24} color="#d4af37" />
+                  <span style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.6)' }}>CMP-310</span>
+                </div>
+                <div className="showcase-book-meta">
+                  <span className="showcase-book-tag">Database Architecture</span>
+                  <h4 className="showcase-book-title">Database System Concepts</h4>
+                  <p className="showcase-book-author">by Avi Silberschatz & Henry Korth</p>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--success)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <CheckCircle2 size={12} /> 4 Copies Available on Shelf 3B
+                  </span>
+                </div>
+              </div>
 
-          <div className="hero-cta-group" style={{ marginBottom: 32 }}>
-            <button className="vanguard-cta-primary" onClick={() => onOpenAuth('register')}>
-              <span>Access Library Portal</span>
-              <div className="btn-nested-icon">
-                <ArrowRight size={16} />
+              <div className="showcase-live-snippet">
+                <div className="snippet-header">
+                  <span>RAG Hybrid Synthesis Preview</span>
+                  <span style={{ color: 'var(--primary)', fontWeight: 600 }}>p. 42 CITED</span>
+                </div>
+                <p className="snippet-body">
+                  "BCNF requires every determinant to be a superkey, completely eliminating structural anomalies when overlapping composite candidate keys exist."
+                </p>
               </div>
-            </button>
-            <a href="#discovery" className="vanguard-cta-secondary">
-              <span>View Live Catalog</span>
-              <div className="btn-nested-icon-secondary">
-                <Compass size={15} />
-              </div>
-            </a>
-          </div>
 
-          {/* Live Platform Quick Metric Capsules */}
-          <div className="hero-capsules-grid" style={{ marginBottom: 0 }}>
-            <div className="hero-capsule-card" onClick={() => onOpenAuth('register')}>
-              <div className="capsule-icon-wrap" style={{ color: '#d4af37' }}>
-                <BookOpen size={18} />
-              </div>
-              <div className="capsule-info">
-                <span className="capsule-title">Physical Titles</span>
-                <span className="capsule-value">{liveStats.total_books} Cataloged</span>
-              </div>
-            </div>
-
-            <div className="hero-capsule-card" onClick={() => onOpenAuth('register')}>
-              <div className="capsule-icon-wrap" style={{ color: '#10b981' }}>
-                <CheckCircle2 size={18} />
-              </div>
-              <div className="capsule-info">
-                <span className="capsule-title">Copies on Shelf</span>
-                <span className="capsule-value">{liveStats.available_copies} Available</span>
-              </div>
-            </div>
-
-            <div className="hero-capsule-card" onClick={() => onOpenAuth('register')}>
-              <div className="capsule-icon-wrap" style={{ color: '#38bdf8' }}>
-                <GraduationCap size={18} />
-              </div>
-              <div className="capsule-info">
-                <span className="capsule-title">BE Curriculum</span>
-                <span className="capsule-value">{liveStats.total_courses} Core Courses</span>
-              </div>
-            </div>
-
-            <div className="hero-capsule-card" onClick={() => onOpenAuth('register')}>
-              <div className="capsule-icon-wrap" style={{ color: '#f59e0b' }}>
-                <Bot size={18} />
-              </div>
-              <div className="capsule-info">
-                <span className="capsule-title">Cognitive Search</span>
-                <span className="capsule-value">Hybrid BM25 RAG</span>
+              <div className="showcase-card-footer">
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <span className="badge badge-info" style={{ fontSize: '0.68rem' }}>PDF In-Browser</span>
+                  <span className="badge badge-primary" style={{ fontSize: '0.68rem' }}>AI Notes Hub</span>
+                </div>
+                <button
+                  className="btn"
+                  style={{ padding: '4px 12px', fontSize: '0.74rem' }}
+                  onClick={() => onOpenAuth('register')}
+                >
+                  Inspect Book <ArrowUpRight size={12} />
+                </button>
               </div>
             </div>
           </div>

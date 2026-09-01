@@ -2631,28 +2631,50 @@ p.success {
 }
 
 /* ==========================================================================
-   Scenic Hero Viewport (Pure Architectural Immersion)
+   Scenic Hero Viewport (50/50 Split Architectural Immersion + 3D Book)
    ========================================================================== */
 
 .vanguard-hero-viewport {
   position: relative;
   z-index: 1;
-  height: 100vh;
-  min-height: 600px;
+  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: flex-end;
-  padding: 0 24px 50px;
-  text-align: center;
+  justify-content: center;
+  padding: 120px 24px 60px;
 }
 
-.hero-viewport-content {
+.hero-split-container {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  align-items: center;
+  gap: 48px;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+@media (max-width: 980px) {
+  .hero-split-container {
+    grid-template-columns: 1fr;
+    text-align: center;
+    gap: 36px;
+  }
+}
+
+.hero-left-column {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  max-width: 800px;
+  align-items: flex-start;
+  text-align: left;
+}
+
+@media (max-width: 980px) {
+  .hero-left-column {
+    align-items: center;
+    text-align: center;
+  }
 }
 
 .hero-atmosphere-tag {
@@ -2671,108 +2693,34 @@ p.success {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
-  margin-bottom: 6px;
+  margin-bottom: 16px;
 }
 
 .hero-viewport-title {
   font-family: var(--font-display);
-  font-size: clamp(3.4rem, 7.5vw, 5.6rem);
+  font-size: clamp(2.4rem, 4.2vw, 3.8rem);
   font-weight: 800;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.035em;
   color: #ffffff;
-  text-shadow: 0 8px 32px rgba(0, 0, 0, 0.85), 0 0 45px rgba(212, 175, 55, 0.25);
-  line-height: 1;
-  margin: 0;
+  text-shadow: 0 8px 32px rgba(0, 0, 0, 0.85), 0 0 45px rgba(212, 175, 55, 0.2);
+  line-height: 1.12;
+  margin: 0 0 16px;
 }
 
 .hero-viewport-subline {
-  font-size: clamp(0.95rem, 1.4vw, 1.15rem);
-  color: rgba(241, 245, 249, 0.9);
-  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.9);
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  margin-bottom: 24px;
-}
-
-.hero-scroll-cue {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  color: rgba(255, 255, 255, 0.85);
-  text-decoration: none;
-  font-size: 0.74rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  transition: all 0.3s ease;
-}
-
-.hero-scroll-cue:hover {
-  color: var(--primary);
-  transform: translateY(2px);
-}
-
-.scroll-cue-bubble {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(8, 12, 20, 0.75);
-  backdrop-filter: blur(14px);
-  border: 1px solid rgba(212, 175, 55, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--primary);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
-  animation: bounceSubtle 2.2s infinite ease-in-out;
-}
-
-/* ==========================================================================
-   Section: Platform Overview, Headline & Quick Capsules Below Hero
-   ========================================================================== */
-
-.vanguard-overview-section {
-  position: relative;
-  z-index: 2;
-  background: #080b12;
-  border-top: 1px solid rgba(212, 175, 55, 0.25);
-  box-shadow: 0 -35px 70px rgba(0, 0, 0, 0.95);
-  padding: 90px 24px 60px;
-  text-align: center;
-}
-
-.vanguard-overview-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.overview-headline-cinematic {
-  font-family: var(--font-display);
-  font-size: clamp(2.4rem, 4.8vw, 3.8rem);
-  font-weight: 800;
-  line-height: 1.15;
-  letter-spacing: -0.035em;
-  color: #fff;
-  margin-bottom: 18px;
-  max-width: 920px;
-}
-
-.overview-subtext-clean {
-  font-size: clamp(1rem, 1.25vw, 1.15rem);
+  font-size: clamp(0.95rem, 1.25vw, 1.1rem);
   color: var(--text-secondary);
-  max-width: 680px;
-  margin: 0 auto 36px;
   line-height: 1.65;
+  font-weight: 400;
+  max-width: 540px;
+  margin-bottom: 28px;
 }
 
 .hero-cta-group {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 16px;
-  margin-bottom: 48px;
+  margin-bottom: 36px;
   flex-wrap: wrap;
 }
 
@@ -2857,6 +2805,179 @@ p.success {
   transform: rotate(45deg);
 }
 
+/* 3D Interactive Showcase Card (Hero Right Column) */
+.hero-3d-stage {
+  perspective: 1400px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.showcase-3d-card {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  background: linear-gradient(135deg, rgba(20, 26, 38, 0.85) 0%, rgba(10, 13, 20, 0.95) 100%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 24px;
+  padding: 28px;
+  box-shadow: 
+    0 24px 60px rgba(0, 0, 0, 0.8),
+    0 0 35px rgba(212, 175, 55, 0.15),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  transform-style: preserve-3d;
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0.2, 1), box-shadow 0.3s ease;
+}
+
+.showcase-3d-card:hover {
+  border-color: rgba(212, 175, 55, 0.55);
+  box-shadow: 
+    0 32px 80px rgba(0, 0, 0, 0.9),
+    0 0 50px rgba(212, 175, 55, 0.28),
+    inset 0 1px 2px rgba(255, 255, 255, 0.3);
+}
+
+/* Floating Badges pinned to 3D Card */
+.showcase-float-badge {
+  position: absolute;
+  top: -14px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(16, 185, 129, 0.2) 100%);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  padding: 4px 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--primary);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  transform: translateZ(30px);
+}
+
+.showcase-book-spine {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.showcase-cover-art {
+  width: 90px;
+  height: 125px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1b2838 0%, #0d1520 100%);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 10px;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.showcase-cover-art::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 6px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.2), transparent);
+}
+
+.showcase-book-meta {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.showcase-book-tag {
+  font-size: 0.7rem;
+  color: var(--primary);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.showcase-book-title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.showcase-book-author {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.showcase-live-snippet {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 18px;
+}
+
+.snippet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.snippet-body {
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.showcase-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Ambient Cursor Spotlight Glow */
+.spotlight-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.spotlight-card::before {
+  content: '';
+  position: absolute;
+  top: var(--mouse-y, -1000px);
+  left: var(--mouse-x, -1000px);
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle, rgba(212, 175, 55, 0.12) 0%, transparent 70%);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 1;
+}
+
+.spotlight-card:hover::before {
+  opacity: 1;
+}
 /* ==========================================================================
    Hero Live Metric Capsules Matrix
    ========================================================================== */
