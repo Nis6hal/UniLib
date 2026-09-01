@@ -2,670 +2,572 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Library,
   BookOpen,
-  FileText,
-  BellRing,
-  ShieldCheck,
+  Compass,
   ArrowRight,
   Sparkles,
-  BookMarked,
-  Layers,
-  CalendarClock,
-  Receipt,
-  RotateCw,
-  FolderUp,
-  HelpCircle,
-  CheckCircle2,
-  Lock,
-  Search,
-  Bot,
-  BrainCircuit,
-  Share2,
-  FileCode,
-  Network,
-  Cpu,
-  GraduationCap,
-  Eye,
-  Sliders,
-  ExternalLink,
-  ChevronRight,
-  ChevronDown,
-  Database,
   Bookmark,
+  ChevronLeft,
+  ChevronRight,
+  ShieldCheck,
+  CheckCircle2,
+  Database,
+  GraduationCap,
+  Bot,
+  Layers,
+  ArrowUpRight,
+  Search,
+  BookMarked,
   Award,
-  Zap,
-  Activity,
-  Compass,
-  ArrowUpRight
+  ExternalLink,
+  Calendar,
+  Clock,
+  LogIn
 } from 'lucide-react';
 import { api } from '../services/api';
+import './AnimatedBookLanding.css';
 
 export default function LandingPage({ onOpenAuth }) {
-  // Live dynamic platform stats — 100% real database queries
+  // Animation Sequence Stage:
+  // 'closed'   -> Closed leather book on dark desk
+  // 'opening'  -> Cover hinges open (1.5s)
+  // 'expanded' -> Book zooms up to fill viewport frame
+  const [animationStage, setAnimationStage] = useState('closed');
+  const [currentChapter, setCurrentChapter] = useState(1); // 1 = Hero, 2 = Features, 3 = How It Works, 4 = CTA/Access
+  const [isFlipping, setIsFlipping] = useState(false);
+  const [flipDirection, setFlipDirection] = useState('forward'); // 'forward' | 'backward'
+
+  // Live database stats
   const [liveStats, setLiveStats] = useState({
     total_books: 20,
-    total_copies: 40,
     available_copies: 34,
-    total_digital_books: 12,
     total_courses: 49,
     total_research_papers: 4,
-    total_members: 15,
-    total_circulation_events: 17,
-    featured_books: []
+    total_members: 15
   });
-  const [loadingStats, setLoadingStats] = useState(true);
 
-  // Interactive Unified Search Simulation State
-  const [activeSearchCategory, setActiveSearchCategory] = useState('Computer Engineering');
-  const searchCategoriesData = {
-    'Computer Engineering': [
-      { type: 'Textbook', title: 'Pattern Recognition and Machine Learning', author: 'Christopher Bishop', tag: 'Physical (Available)', color: '#d4af37' },
-      { type: 'Peer-Reviewed Thesis', title: 'Attention Is All You Need: Transformer Models', author: 'Vaswani et al. (NeurIPS)', tag: 'DOI: 10.48550', color: '#38bdf8' },
-      { type: 'Journal Article', title: 'Deep Residual Learning for Image Recognition', author: 'He et al. (IEEE TPAMI)', tag: 'Vol 42, Issue 3', color: '#10b981' },
-      { type: 'Syllabus Course', title: 'CMP-310: Database Management Systems Core', author: 'Dept. of Computer Engineering', tag: 'Semester 5', color: '#f59e0b' }
-    ],
-    'Algorithms & Data Structures': [
-      { type: 'Textbook', title: 'Introduction to Algorithms (4th Edition)', author: 'Cormen, Leiserson, Rivest, Stein', tag: 'Physical Copy', color: '#d4af37' },
-      { type: 'Curriculum Resource', title: 'B+ Trees & Red-Black Tree Balancing Notes', author: 'Faculty of Computer Science', tag: 'CMP-210 Core', color: '#10b981' },
-      { type: 'Research Thesis', title: 'Cache-Oblivious Search Structures', author: 'Frigo & Demaine (FOCS)', tag: 'Landmark', color: '#38bdf8' }
-    ],
-    'Distributed Systems': [
-      { type: 'Textbook', title: 'Designing Data-Intensive Applications', author: 'Martin Kleppmann', tag: 'Physical Copy', color: '#d4af37' },
-      { type: 'Research Thesis', title: 'Spanner: Globally-Distributed Database Architecture', author: 'Corbett et al. (Google/OSDI)', tag: 'Peer-Reviewed', color: '#38bdf8' },
-      { type: 'Journal Article', title: 'In Search of an Understandable Consensus Algorithm (Raft)', author: 'Ongaro & Ousterhout (USENIX)', tag: 'Verified Citation', color: '#10b981' }
-    ]
-  };
+  const canvasRef = useRef(null);
 
-  // Interactive AI Study Assistant Sandbox State
-  const [activeRagMode, setActiveRagMode] = useState('Deep Analysis');
-  const ragSimulations = {
-    'Deep Analysis': {
-      title: 'Deep Academic Synthesis • Relational Normalization & BCNF',
-      text: 'Normalization decomposes relational schemas to eliminate insertion, update, and deletion anomalies. Boyce-Codd Normal Form (BCNF) strictly requires that for every non-trivial functional dependency X -> Y, X must be a superkey. Unlike 3NF, BCNF resolves structural redundancies when multiple overlapping candidate keys exist.',
-      page: 42,
-      confidence: '99%',
-      badge: 'Verified Grounding'
-    },
-    'Quick Summary': {
-      title: 'High-Yield Conceptual Digest',
-      text: '1. 1NF eliminates repeating groups and composite fields.\n2. 2NF removes partial key functional dependencies.\n3. 3NF removes transitive dependencies (X -> Y -> Z).\n4. BCNF enforces that every determinant is strictly a candidate key.',
-      page: 42,
-      confidence: '97%',
-      badge: 'Executive Digest'
-    },
-    'Exam Flashcard': {
-      title: 'Active-Recall Study Flashcard',
-      text: 'Prompt: What distinguishes BCNF from 3NF regarding candidate key determinants?\n\nAnswer: 3NF permits dependency X -> A if A is a prime attribute (part of any candidate key), whereas BCNF strictly disallows this unless X itself is a full superkey.',
-      page: 43,
-      confidence: '98%',
-      badge: 'Flashcard #14'
-    },
-    'Practice Quiz': {
-      title: 'Bloom\'s Taxonomy Evaluative Question',
-      text: 'Question: Given relation R(A, B, C) with dependencies A -> B and B -> C, in what highest normal form is R?\n\n[A] 1NF\n[B] 2NF (Correct — B -> C violates 3NF due to transitive dependency)\n[C] 3NF\n[D] BCNF',
-      page: 45,
-      confidence: '99%',
-      badge: 'Exam Grader'
-    }
-  };
-
-  // Interactive Knowledge Graph Active Node State
-  const [selectedGraphNode, setSelectedGraphNode] = useState('Databases');
-  const graphNodes = [
-    { id: 'Databases', label: 'Relational DBs', sub: '12 Volumes • 3NF/BCNF', x: 20, y: 35, color: '#d4af37' },
-    { id: 'AI', label: 'Machine Learning', sub: '8 Volumes • Neural Nets', x: 50, y: 20, color: '#38bdf8' },
-    { id: 'Distributed', label: 'Distributed Systems', sub: '6 Volumes • Raft/Paxos', x: 80, y: 40, color: '#10b981' },
-    { id: 'Algorithms', label: 'Data Structures', sub: '14 Volumes • Graphs/Trees', x: 35, y: 75, color: '#f59e0b' },
-    { id: 'Security', label: 'Network Security', sub: '5 Volumes • Crypto/TLS', x: 68, y: 80, color: '#ec4899' }
-  ];
-
+  // Load live platform statistics
   useEffect(() => {
     async function fetchStats() {
       try {
-        setLoadingStats(true);
         const data = await api.getPublicStats();
-        setLiveStats(data);
+        if (data) setLiveStats(data);
       } catch (err) {
         console.error('Failed to load public stats:', err);
-      } finally {
-        setLoadingStats(false);
       }
     }
     fetchStats();
   }, []);
 
+  // Ambient Dust Motes Canvas Particle System
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animationFrameId;
+
+    let width = (canvas.width = window.innerWidth);
+    let height = (canvas.height = window.innerHeight);
+
+    const handleResize = () => {
+      if (!canvas) return;
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    };
+    window.addEventListener('resize', handleResize);
+
+    // Generate dust mote particles
+    const motesCount = window.innerWidth < 768 ? 35 : 75;
+    const motes = Array.from({ length: motesCount }, () => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      size: Math.random() * 2 + 0.5,
+      speedX: (Math.random() - 0.5) * 0.35,
+      speedY: -Math.random() * 0.45 - 0.1,
+      opacity: Math.random() * 0.6 + 0.15,
+      pulse: Math.random() * Math.PI
+    }));
+
+    const render = () => {
+      ctx.clearRect(0, 0, width, height);
+
+      motes.forEach((m) => {
+        m.x += m.speedX;
+        m.y += m.speedY;
+        m.pulse += 0.02;
+
+        if (m.y < -10) {
+          m.y = height + 10;
+          m.x = Math.random() * width;
+        }
+        if (m.x < -10) m.x = width + 10;
+        if (m.x > width + 10) m.x = -10;
+
+        const currentOpacity = m.opacity + Math.sin(m.pulse) * 0.15;
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, m.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(235, 205, 120, ${Math.max(0, currentOpacity)})`;
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = 'rgba(212, 175, 55, 0.4)';
+        ctx.fill();
+      });
+
+      animationFrameId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, []);
+
+  // Automatic initial book open & viewport scale sequence
+  useEffect(() => {
+    // Respect prefers-reduced-motion
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setAnimationStage('expanded');
+      return;
+    }
+
+    // Step 1: Closed book loads (1.0s initial pause for awe)
+    const t1 = setTimeout(() => {
+      setAnimationStage('opening'); // Step 2: Cover hinges open (1.5s)
+    }, 1000);
+
+    // Step 3: Scales up to fill viewport frame
+    const t2 = setTimeout(() => {
+      setAnimationStage('expanded');
+    }, 2500);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, []);
+
+  // Handle Page Turn Navigation with Authentic Paper Physics Easing (0.8s - 1.2s)
+  const turnToChapter = (nextCh) => {
+    if (isFlipping || nextCh === currentChapter || nextCh < 1 || nextCh > 4) return;
+
+    setIsFlipping(true);
+    setFlipDirection(nextCh > currentChapter ? 'forward' : 'backward');
+
+    // Page flip transition duration ~1050ms
+    setTimeout(() => {
+      setCurrentChapter(nextCh);
+      setIsFlipping(false);
+    }, 1050);
+  };
+
+  // Keyboard navigation for turning pages
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+        e.preventDefault();
+        turnToChapter(currentChapter + 1);
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        turnToChapter(currentChapter - 1);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentChapter, isFlipping]);
+
   return (
-    <div className="landing-page-vanguard">
-      {/* Fixed Majestic Library Background for Scroll-Reveal Effect */}
-      <div className="landing-hero-backdrop">
-        <div className="landing-hero-backdrop-overlay" />
-      </div>
+    <div className="book-stage-viewport">
+      {/* Floating Ambient Dust Particles Canvas */}
+      <canvas ref={canvasRef} className="dust-motes-canvas" />
 
-      {/* Background Ambient Glow Orbs */}
-      <div className="vanguard-bg-orbs">
-        <div className="ambient-orb orb-gold" />
-        <div className="ambient-orb orb-cyan" />
-        <div className="ambient-orb orb-indigo" />
-      </div>
-
-      {/* Floating Glass Island Navbar */}
-      <nav className="vanguard-floating-nav">
-        <div className="nav-brand-pill">
-          <div className="nav-brand-icon">
+      {/* Top Leather-Toned Floating Navbar */}
+      <nav className="book-top-nav">
+        <div className="book-nav-brand">
+          <div className="book-nav-logo">
             <Library size={18} />
           </div>
-          <span className="nav-brand-name">UniLib</span>
-          <span className="nav-brand-badge">Academic 2.0</span>
+          <span className="book-nav-title">UniLib</span>
+          <span className="book-nav-subtitle">Academic 2.0</span>
         </div>
 
-        <div className="nav-links-island">
-          <a href="#discovery" className="nav-link-item">Catalog Discovery</a>
-          <a href="#rag-engine" className="nav-link-item">Hybrid RAG</a>
-          <a href="#curriculum" className="nav-link-item">BE Curriculum</a>
-          <a href="#graph" className="nav-link-item">Knowledge Matrix</a>
-        </div>
-
-        <div className="nav-actions-island">
-          <button className="nav-btn-ghost" onClick={() => onOpenAuth('login')}>
-            Sign In
+        <div className="book-nav-actions">
+          <button className="book-btn-secondary" onClick={() => onOpenAuth('login')}>
+            <LogIn size={14} style={{ display: 'inline', marginRight: 6 }} /> Sign In
           </button>
-          <button className="nav-btn-primary" onClick={() => onOpenAuth('register')}>
-            <span>Explore Library</span>
-            <div className="btn-nested-icon">
-              <ArrowUpRight size={14} />
-            </div>
+          <button className="book-btn-primary" onClick={() => onOpenAuth('register')}>
+            <span>Access Portal</span>
+            <ArrowRight size={14} />
           </button>
         </div>
       </nav>
 
-      {/* Scenic Hero Viewport — Pure Immersive Architectural View */}
-      <section className="vanguard-hero-viewport">
-        <div className="hero-viewport-content">
-          <div className="hero-atmosphere-tag">
-            <Sparkles size={13} color="var(--primary)" />
-            <span>Digital Archive & Living Academic Sanctuary</span>
+      {/* Main 3D Animated Book Container */}
+      <div className={`book-3d-wrapper stage-${animationStage}`}>
+        {/* Soft Desk Ambient Drop Shadow */}
+        <div className="book-desk-shadow" />
+
+        {/* 1. Closed Leather-Bound Book Cover (Hinges Open on Load) */}
+        <div
+          className="closed-book-cover"
+          onClick={() => {
+            if (animationStage === 'closed') {
+              setAnimationStage('opening');
+              setTimeout(() => setAnimationStage('expanded'), 1500);
+            }
+          }}
+        >
+          <div className="cover-spine-edge" />
+          <div className="cover-gold-border" />
+
+          <div className="cover-header">
+            <div className="cover-institute">Faculty of Computer Engineering</div>
+            <div className="cover-crest">
+              <BookMarked size={42} />
+            </div>
           </div>
 
-          <h1 className="hero-viewport-title">
-            UniLib
-          </h1>
-
-          <p className="hero-viewport-subline">
-            University Research Archival & Knowledge Intelligence
-          </p>
-
-          <a href="#overview" className="hero-scroll-cue">
-            <span className="scroll-cue-text">Enter Archive</span>
-            <div className="scroll-cue-bubble">
-              <ChevronDown size={15} />
-            </div>
-          </a>
-        </div>
-      </section>
-
-      {/* Section: Platform Overview, Headline, CTAs & Quick Capsules */}
-      <section id="overview" className="vanguard-overview-section">
-        <div className="vanguard-overview-content max-w-5xl mx-auto text-center">
-          <div className="hero-eyebrow-pill animate-in">
-            <Sparkles size={13} color="var(--primary)" />
-            <span>Next-Generation University Knowledge Ecosystem</span>
+          <div className="cover-body">
+            <h1 className="cover-title">UNILIB</h1>
+            <p className="cover-subtitle">Codex of Higher Learning & Research Repository</p>
           </div>
 
-          <h2 className="overview-headline-cinematic animate-in">
-            The University Library, <br />
-            <span className="headline-gradient-shimmer">
-              Reimagined for 2026.
-            </span>
-          </h2>
-
-          <p className="overview-subtext-clean animate-in">
-            Unifying physical book circulation, 8-semester BE computer curriculum, peer-reviewed research papers, and hybrid RAG study intelligence.
-          </p>
-
-          <div className="hero-cta-group animate-in">
-            <button className="vanguard-cta-primary" onClick={() => onOpenAuth('register')}>
-              <span>Access Library Portal</span>
-              <div className="btn-nested-icon">
-                <ArrowRight size={16} />
-              </div>
-            </button>
-            <a href="#discovery" className="vanguard-cta-secondary">
-              <span>View Live Catalog</span>
-              <div className="btn-nested-icon-secondary">
-                <Compass size={15} />
-              </div>
-            </a>
-          </div>
-
-          {/* Live Platform Quick Capsules Matrix */}
-          <div className="hero-capsules-grid animate-in">
-            <div className="hero-capsule-card" onClick={() => onOpenAuth('register')}>
-              <div className="capsule-icon-wrap" style={{ color: '#d4af37' }}>
-                <BookOpen size={18} />
-              </div>
-              <div className="capsule-info">
-                <span className="capsule-title">Physical Titles</span>
-                <span className="capsule-value">{liveStats.total_books} Cataloged</span>
-              </div>
-            </div>
-
-            <div className="hero-capsule-card" onClick={() => onOpenAuth('register')}>
-              <div className="capsule-icon-wrap" style={{ color: '#10b981' }}>
-                <CheckCircle2 size={18} />
-              </div>
-              <div className="capsule-info">
-                <span className="capsule-title">Copies on Shelf</span>
-                <span className="capsule-value">{liveStats.available_copies} Available</span>
-              </div>
-            </div>
-
-            <div className="hero-capsule-card" onClick={() => onOpenAuth('register')}>
-              <div className="capsule-icon-wrap" style={{ color: '#38bdf8' }}>
-                <GraduationCap size={18} />
-              </div>
-              <div className="capsule-info">
-                <span className="capsule-title">BE Curriculum</span>
-                <span className="capsule-value">{liveStats.total_courses} Core Courses</span>
-              </div>
-            </div>
-
-            <div className="hero-capsule-card" onClick={() => onOpenAuth('register')}>
-              <div className="capsule-icon-wrap" style={{ color: '#f59e0b' }}>
-                <Bot size={18} />
-              </div>
-              <div className="capsule-info">
-                <span className="capsule-title">Cognitive Search</span>
-                <span className="capsule-value">Hybrid BM25 RAG</span>
-              </div>
+          <div className="cover-footer">
+            <div className="cover-open-cue">
+              <Sparkles size={14} color="#d4af37" />
+              <span>Click to Open Volume</span>
             </div>
           </div>
         </div>
-      </section>
 
-      {/* Real-Time Live Campus Metrics Strip */}
-      <section className="vanguard-metrics-strip">
-        <div className="metrics-strip-shell">
-          <div className="metric-cell">
-            <div className="metric-number">{liveStats.total_books || '20'}</div>
-            <div className="metric-label">Physical Catalog Titles</div>
-          </div>
-          <div className="metric-divider" />
-          <div className="metric-cell">
-            <div className="metric-number">{liveStats.available_copies || '34'}</div>
-            <div className="metric-label">Available on Shelf</div>
-          </div>
-          <div className="metric-divider" />
-          <div className="metric-cell">
-            <div className="metric-number">{liveStats.total_courses || '49'}</div>
-            <div className="metric-label">8-Semester BE Courses</div>
-          </div>
-          <div className="metric-divider" />
-          <div className="metric-cell">
-            <div className="metric-number">{liveStats.total_research_papers || '4'}</div>
-            <div className="metric-label">Peer-Reviewed Theses</div>
-          </div>
-          <div className="metric-divider" />
-          <div className="metric-cell">
-            <div className="metric-number">{liveStats.total_members || '15'}</div>
-            <div className="metric-label">Registered Scholars</div>
-          </div>
-        </div>
-      </section>
+        {/* 2. The Open Book Spread (Two Parchment Pages with Real Typography) */}
+        <div className="open-book-spread">
+          <div className="book-spine-crease" />
+          <div className="book-ribbon-bookmark" />
 
-      {/* Section 1: Unified Academic Discovery Simulator */}
-      <section id="discovery" className="vanguard-section">
-        <div className="section-head-centered">
-          <div className="section-eyebrow">Instant Cross-Catalog Index</div>
-          <h2 className="section-title-large">Unified Academic Discovery</h2>
-          <p className="section-subtext-balanced">
-            Search physical books, syllabus notes, research papers, and faculty theses through one indexed catalog.
-          </p>
-        </div>
-
-        {/* Double-Bezel Search Simulator Card */}
-        <div className="vanguard-double-bezel max-w-5xl mx-auto">
-          <div className="double-bezel-inner">
-            <div className="sim-toolbar">
-              <div className="sim-categories">
-                {Object.keys(searchCategoriesData).map((cat) => (
-                  <button
-                    key={cat}
-                    className={`sim-cat-btn ${activeSearchCategory === cat ? 'active' : ''}`}
-                    onClick={() => setActiveSearchCategory(cat)}
-                  >
-                    <Search size={13} /> {cat}
-                  </button>
-                ))}
-              </div>
-              <div className="sim-count-badge">
-                <Activity size={13} color="var(--primary)" />
-                <span>{searchCategoriesData[activeSearchCategory]?.length || 0} Indexed Items</span>
-              </div>
+          {/* Left Page: Always Contextual Anchor & Chapter Overview */}
+          <div className="book-page-leaf left-page">
+            <div className="page-running-header">
+              <span>UniLib University Codex</span>
+              <span>Anno Domini 2026</span>
             </div>
 
-            <div className="sim-results-grid">
-              {searchCategoriesData[activeSearchCategory]?.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="sim-result-card"
-                  onClick={() => onOpenAuth('register')}
-                  title="Click to view full volume in catalog"
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className="sim-card-top">
-                    <span className="sim-type-badge" style={{ borderColor: `${item.color}40`, color: item.color }}>
-                      {item.type}
-                    </span>
-                    <span className="sim-tag-live">
-                      <CheckCircle2 size={12} color="var(--success)" /> {item.tag}
-                    </span>
-                  </div>
-                  <h4 className="sim-item-title">{item.title}</h4>
-                  <p className="sim-item-author">by {item.author}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+            <div className="page-inner-scroll">
+              <div className="chapter-badge">Chapter 0{currentChapter} • Academic Manifesto</div>
+              <h2 className="chapter-title-grand">
+                {currentChapter === 1 && "Preserving Centuries of Heritage"}
+                {currentChapter === 2 && "The Pillars of Intelligence"}
+                {currentChapter === 3 && "The Scholar's Pathway"}
+                {currentChapter === 4 && "The Gate of Matriculation"}
+              </h2>
 
-      {/* Section 2: Hybrid Academic RAG Intelligence Sandbox */}
-      <section id="rag-engine" className="vanguard-section" style={{ background: 'rgba(12, 15, 22, 0.7)' }}>
-        <div className="section-head-centered">
-          <div className="section-eyebrow">Production-Grade Intelligence</div>
-          <h2 className="section-title-large">Hybrid BM25 + Semantic RAG Engine</h2>
-          <p className="section-subtext-balanced">
-            Multi-stage retrieval combining BM25Okapi lexical precision, dense N-gram vectors, Reciprocal Rank Fusion, and exact page citations.
-          </p>
-        </div>
+              <p className="chapter-subhead">
+                {currentChapter === 1 && "Where classical architectural grandeur meets computational retrieval."}
+                {currentChapter === 2 && "A unified repository for physical circulation, digital texts, and course syllabi."}
+                {currentChapter === 3 && "From instant catalogue search to AI-grounded deep synthesis."}
+                {currentChapter === 4 && "Join scholars, faculty members, and research engineers."}
+              </p>
 
-        {/* Double-Bezel RAG Grid */}
-        <div className="vanguard-double-bezel max-w-5xl mx-auto">
-          <div className="double-bezel-inner rag-grid-container">
-            <div className="rag-sidebar-modes">
-              <div className="rag-sidebar-header">
-                <Bot size={20} color="var(--primary)" />
+              <hr className="parchment-divider" />
+
+              {/* Left Page Detail Modules */}
+              {currentChapter === 1 && (
                 <div>
-                  <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Synthesis Strategies</h4>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Multi-mode study engine</span>
-                </div>
-              </div>
-
-              <div className="rag-mode-list">
-                {Object.keys(ragSimulations).map((mode) => (
-                  <button
-                    key={mode}
-                    className={`rag-mode-pill ${activeRagMode === mode ? 'active' : ''}`}
-                    onClick={() => setActiveRagMode(mode)}
-                  >
-                    <Sparkles size={14} color="var(--primary)" />
-                    <span>{mode}</span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="rag-confidence-widget">
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: 6 }}>
-                  <span>Grounding Reliability</span>
-                  <strong style={{ color: 'var(--success)' }}>{ragSimulations[activeRagMode]?.confidence}</strong>
-                </div>
-                <div className="confidence-track">
-                  <div className="confidence-fill" style={{ width: ragSimulations[activeRagMode]?.confidence }} />
-                </div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 6 }}>
-                  Source: Database System Concepts (Page {ragSimulations[activeRagMode]?.page})
-                </div>
-              </div>
-            </div>
-
-            <div className="rag-terminal-display">
-              <div className="terminal-header">
-                <div className="terminal-badge">
-                  <ShieldCheck size={14} color="var(--primary)" />
-                  <span>{ragSimulations[activeRagMode]?.title}</span>
-                </div>
-                <span className="terminal-page-tag">
-                  Page {ragSimulations[activeRagMode]?.page} Verified
-                </span>
-              </div>
-
-              <div className="terminal-content">
-                <p className="terminal-text">
-                  {ragSimulations[activeRagMode]?.text}
-                </p>
-              </div>
-
-              <div className="terminal-footer">
-                <div className="footer-citation-note">
-                  <Sparkles size={13} color="var(--primary)" />
-                  <span>Citations anchored with mathematical BM25 term coverage and Reciprocal Rank Fusion.</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Section 3: Interactive Academic Knowledge Matrix */}
-      <section id="graph" className="vanguard-section">
-        <div className="section-head-centered">
-          <div className="section-eyebrow">Semantic Subject Mesh</div>
-          <h2 className="section-title-large">Interactive Academic Knowledge Matrix</h2>
-          <p className="section-subtext-balanced">
-            Explore interconnected university subject clusters, course prerequisites, and faculty research repositories.
-          </p>
-        </div>
-
-        <div className="vanguard-double-bezel max-w-5xl mx-auto">
-          <div className="double-bezel-inner graph-stage-inner">
-            <svg className="graph-svg-canvas" viewBox="0 0 100 100" preserveAspectRatio="none">
-              <line x1="20" y1="35" x2="50" y2="20" stroke="rgba(212,175,55,0.25)" strokeWidth="0.6" strokeDasharray="1.5,1.5" />
-              <line x1="50" y1="20" x2="80" y2="40" stroke="rgba(56,189,248,0.25)" strokeWidth="0.6" strokeDasharray="1.5,1.5" />
-              <line x1="20" y1="35" x2="35" y2="75" stroke="rgba(212,175,55,0.25)" strokeWidth="0.6" strokeDasharray="1.5,1.5" />
-              <line x1="35" y1="75" x2="68" y2="80" stroke="rgba(245,158,11,0.25)" strokeWidth="0.6" strokeDasharray="1.5,1.5" />
-              <line x1="80" y1="40" x2="68" y2="80" stroke="rgba(16,185,129,0.25)" strokeWidth="0.6" strokeDasharray="1.5,1.5" />
-              <line x1="50" y1="20" x2="35" y2="75" stroke="rgba(255,255,255,0.15)" strokeWidth="0.5" />
-            </svg>
-
-            <div className="graph-nodes-wrapper">
-              {graphNodes.map((node) => (
-                <div
-                  key={node.id}
-                  className={`graph-node-bubble ${selectedGraphNode === node.id ? 'active' : ''}`}
-                  style={{ left: `${node.x}%`, top: `${node.y}%` }}
-                  onClick={() => setSelectedGraphNode(node.id)}
-                >
-                  <div className="node-dot" style={{ background: node.color }} />
-                  <div className="node-label-wrap">
-                    <span className="node-title">{node.label}</span>
-                    <span className="node-sub">{node.sub}</span>
+                  <p style={{ fontSize: '0.94rem', lineHeight: 1.7, marginBottom: 14, color: 'var(--ink-primary)' }}>
+                    <span className="drop-cap">U</span>niLib reimagines the university library as an interconnected digital sanctuary. By uniting physical shelf circulation with 8-semester BE courseware and AI retrieval, scholars explore human knowledge with unprecedented velocity.
+                  </p>
+                  
+                  {/* Live Quick Counters */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 16 }}>
+                    <div style={{ background: 'rgba(238, 228, 204, 0.7)', border: '1px solid rgba(180, 160, 130, 0.5)', padding: 10, borderRadius: 6 }}>
+                      <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--gold-accent)', fontWeight: 700, display: 'block' }}>Physical Titles</span>
+                      <strong style={{ fontSize: '1.25rem', fontFamily: 'var(--font-serif-display)', color: 'var(--ink-primary)' }}>{liveStats.total_books} Cataloged</strong>
+                    </div>
+                    <div style={{ background: 'rgba(238, 228, 204, 0.7)', border: '1px solid rgba(180, 160, 130, 0.5)', padding: 10, borderRadius: 6 }}>
+                      <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--gold-accent)', fontWeight: 700, display: 'block' }}>Copies Available</span>
+                      <strong style={{ fontSize: '1.25rem', fontFamily: 'var(--font-serif-display)', color: 'var(--ink-accent)' }}>{liveStats.available_copies} Ready</strong>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
 
-            {/* Dynamic Selected Node Intelligence Card */}
-            {selectedGraphNode && (
-              <div style={{
-                position: 'absolute',
-                bottom: 16,
-                left: 20,
-                right: 20,
-                background: 'rgba(10, 14, 22, 0.88)',
-                backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(212, 175, 55, 0.25)',
-                borderRadius: 'var(--radius-md)',
-                padding: '12px 18px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: 10,
-                zIndex: 10
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: '50%',
-                    background: graphNodes.find(n => n.id === selectedGraphNode)?.color || 'var(--primary)'
-                  }} />
-                  <div>
-                    <strong style={{ fontSize: '0.85rem', color: 'var(--text-main)' }}>
-                      {graphNodes.find(n => n.id === selectedGraphNode)?.label} Cluster
-                    </strong>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: 8 }}>
-                      {graphNodes.find(n => n.id === selectedGraphNode)?.sub}
+              {currentChapter === 2 && (
+                <div>
+                  <p style={{ fontSize: '0.92rem', lineHeight: 1.6, color: 'var(--ink-secondary)', marginBottom: 14 }}>
+                    Traditional library databases separate physical book loans from modern digital study tools. UniLib unites them under a single, authoritative academic ledger.
+                  </p>
+                  <div style={{ background: 'rgba(238, 228, 204, 0.6)', borderLeft: '3px solid var(--ink-accent)', padding: '10px 14px', borderRadius: '0 6px 6px 0' }}>
+                    <strong style={{ fontSize: '0.86rem', display: 'block', color: 'var(--ink-primary)', marginBottom: 2 }}>Complete Academic Coverage</strong>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--ink-secondary)' }}>8-semester engineering syllabus, peer-reviewed theses, and full-text study notes hub.</span>
+                  </div>
+                </div>
+              )}
+
+              {currentChapter === 3 && (
+                <div>
+                  <p style={{ fontSize: '0.92rem', lineHeight: 1.6, color: 'var(--ink-secondary)', marginBottom: 14 }}>
+                    Our search infrastructure blends lexical BM25 term precision with dense semantic grounding, citing exact page numbers and chapter references in seconds.
+                  </p>
+                  <div style={{ background: 'rgba(238, 228, 204, 0.6)', padding: 12, borderRadius: 6, border: '1px solid rgba(180, 160, 130, 0.4)' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--gold-accent)', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                      Verified Grounding
+                    </span>
+                    <p style={{ fontSize: '0.82rem', margin: 0, fontStyle: 'italic', color: 'var(--ink-primary)' }}>
+                      "Every AI answer is cross-referenced with syllabus textbook page ranges to guarantee 100% academic integrity."
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {currentChapter === 4 && (
+                <div>
+                  <p style={{ fontSize: '0.92rem', lineHeight: 1.6, color: 'var(--ink-secondary)', marginBottom: 14 }}>
+                    Empower your academic journey today. Whether you are an undergraduate student preparing for examinations or a faculty librarian managing thousands of volumes.
+                  </p>
+                  <div style={{ textAlign: 'center', padding: '12px 0' }}>
+                    <span style={{ fontFamily: 'var(--font-serif-display)', fontStyle: 'italic', fontSize: '1.05rem', color: 'var(--ink-accent)' }}>
+                      "Ex Scientia, Victoria"
                     </span>
                   </div>
                 </div>
-                <button
-                  className="btn"
-                  style={{ padding: '4px 12px', fontSize: '0.74rem' }}
-                  onClick={() => onOpenAuth('register')}
-                >
-                  Explore Course Materials <ArrowUpRight size={12} />
-                </button>
+              )}
+            </div>
+
+            <div className="page-running-footer">
+              <span>Folio {currentChapter * 2 - 1}</span>
+              <span className="page-num-tag">{currentChapter * 2 - 1}</span>
+            </div>
+          </div>
+
+          {/* Right Page: Primary Chapter Interactive Content */}
+          <div className="book-page-leaf right-page">
+            <div className="page-running-header">
+              <span>Section {currentChapter} of IV</span>
+              <span>UniLib Repository</span>
+            </div>
+
+            <div className="page-inner-scroll">
+              {/* PAGE 1 = HERO / INTRO */}
+              {currentChapter === 1 && (
+                <div>
+                  <div className="chapter-badge">Entry Portal</div>
+                  <h3 style={{ fontFamily: 'var(--font-serif-display)', fontSize: '1.75rem', color: 'var(--ink-primary)', marginBottom: 8 }}>
+                    The Next-Generation University Library
+                  </h3>
+                  <p style={{ fontSize: '0.95rem', lineHeight: 1.65, color: 'var(--ink-secondary)', marginBottom: 18 }}>
+                    Welcome to the living archive. Explore physical book circulation, full-text in-browser reading, course syllabus repositories, and intelligent academic synthesis.
+                  </p>
+
+                  {/* Feature Parchment Pills */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '14px 0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'rgba(238, 228, 204, 0.7)', borderRadius: 6, border: '1px solid rgba(180, 160, 130, 0.5)' }}>
+                      <CheckCircle2 size={18} color="var(--ink-accent)" />
+                      <span style={{ fontSize: '0.88rem', color: 'var(--ink-primary)' }}>Instant Physical Book Issue & Digital Reservation</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'rgba(238, 228, 204, 0.7)', borderRadius: 6, border: '1px solid rgba(180, 160, 130, 0.5)' }}>
+                      <CheckCircle2 size={18} color="var(--ink-accent)" />
+                      <span style={{ fontSize: '0.88rem', color: 'var(--ink-primary)' }}>8-Semester BE Computer Syllabus & Lab Guides</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'rgba(238, 228, 204, 0.7)', borderRadius: 6, border: '1px solid rgba(180, 160, 130, 0.5)' }}>
+                      <CheckCircle2 size={18} color="var(--ink-accent)" />
+                      <span style={{ fontSize: '0.88rem', color: 'var(--ink-primary)' }}>Compact E-Reader for PDF and DOCX Volumes</span>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 20 }}>
+                    <button className="parchment-action-btn" onClick={() => turnToChapter(2)}>
+                      <span>Turn to Features (Page 2)</span>
+                      <ArrowRight size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* PAGE 2 = FEATURES */}
+              {currentChapter === 2 && (
+                <div>
+                  <div className="chapter-badge">Chapter 02 • Core Systems</div>
+                  <h3 style={{ fontFamily: 'var(--font-serif-display)', fontSize: '1.65rem', color: 'var(--ink-primary)', marginBottom: 12 }}>
+                    Comprehensive Library Architecture
+                  </h3>
+
+                  <div className="parchment-features-grid">
+                    <div className="parchment-seal-card">
+                      <div className="seal-icon-wrap"><BookOpen size={20} /></div>
+                      <h4 className="seal-title">Circulation & Fines</h4>
+                      <p className="seal-desc">Automated loan tracking, overdue calculations, and return receipts.</p>
+                    </div>
+
+                    <div className="parchment-seal-card">
+                      <div className="seal-icon-wrap"><GraduationCap size={20} /></div>
+                      <h4 className="seal-title">BE Curriculum Hub</h4>
+                      <p className="seal-desc">49 organized courses across 8 semesters with textbooks and slides.</p>
+                    </div>
+
+                    <div className="parchment-seal-card">
+                      <div className="seal-icon-wrap"><Bot size={20} /></div>
+                      <h4 className="seal-title">Hybrid Study AI</h4>
+                      <p className="seal-desc">Generate quizzes, active-recall flashcards, and chapter digests.</p>
+                    </div>
+
+                    <div className="parchment-seal-card">
+                      <div className="seal-icon-wrap"><Database size={20} /></div>
+                      <h4 className="seal-title">PDF & DOCX Reader</h4>
+                      <p className="seal-desc">In-browser paginated reading with progress sync and dark/sepia themes.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* PAGE 3 = HOW IT WORKS */}
+              {currentChapter === 3 && (
+                <div>
+                  <div className="chapter-badge">Chapter 03 • Methodology</div>
+                  <h3 style={{ fontFamily: 'var(--font-serif-display)', fontSize: '1.65rem', color: 'var(--ink-primary)', marginBottom: 12 }}>
+                    How UniLib Powers Learning
+                  </h3>
+
+                  <div className="how-it-works-scroll">
+                    <div className="how-step-row">
+                      <div className="step-num-roman">I</div>
+                      <div className="step-content-body">
+                        <h4>Explore the Unified Archive</h4>
+                        <p>Search physical books on shelf, digital research papers, and faculty lecture notes in one click.</p>
+                      </div>
+                    </div>
+
+                    <div className="how-step-row">
+                      <div className="step-num-roman">II</div>
+                      <div className="step-content-body">
+                        <h4>Borrow or Read Digitally</h4>
+                        <p>Reserve hardcopies with automated due-date alerts, or open digital volumes directly in your browser.</p>
+                      </div>
+                    </div>
+
+                    <div className="how-step-row">
+                      <div className="step-num-roman">III</div>
+                      <div className="step-content-body">
+                        <h4>Synthesize & Review Notes</h4>
+                        <p>Highlight passages, ask conceptual questions to the AI assistant, and export study notes.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* PAGE 4 = CALL TO ACTION / ACCESS */}
+              {currentChapter === 4 && (
+                <div>
+                  <div className="chapter-badge">Chapter 04 • Matriculation</div>
+                  <h3 style={{ fontFamily: 'var(--font-serif-display)', fontSize: '1.65rem', color: 'var(--ink-primary)', marginBottom: 12 }}>
+                    Begin Your Academic Journey
+                  </h3>
+
+                  <div className="parchment-cta-box">
+                    <h4 style={{ fontFamily: 'var(--font-serif-display)', fontSize: '1.25rem', color: 'var(--ink-primary)', marginBottom: 8 }}>
+                      Create Scholar Account
+                    </h4>
+                    <p style={{ fontSize: '0.88rem', color: 'var(--ink-secondary)', marginBottom: 16 }}>
+                      Gain immediate access to university reserves, course study decks, and research archives.
+                    </p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+                      <button className="parchment-action-btn" onClick={() => onOpenAuth('register')}>
+                        <span>Register as University Member</span>
+                        <ArrowRight size={16} />
+                      </button>
+
+                      <button
+                        className="book-btn-secondary"
+                        style={{ color: 'var(--ink-primary)', borderColor: 'var(--ink-muted)' }}
+                        onClick={() => onOpenAuth('login')}
+                      >
+                        Administrative / Faculty Sign In
+                      </button>
+                    </div>
+                  </div>
+
+                  <p style={{ textAlign: 'center', fontSize: '0.78rem', color: 'var(--ink-muted)', margin: 0 }}>
+                    Official University Library System • Academic Year 2026
+                  </p>
+                </div>
+              )}
+
+              {/* Bottom Leaf Corner Navigation Cue */}
+              {currentChapter < 4 && (
+                <div className="book-leaf-corner-cue" onClick={() => turnToChapter(currentChapter + 1)}>
+                  <span>Turn to Page {currentChapter + 1}</span>
+                  <ChevronRight size={14} />
+                </div>
+              )}
+            </div>
+
+            <div className="page-running-footer">
+              <span>Folio {currentChapter * 2}</span>
+              <span className="page-num-tag">{currentChapter * 2}</span>
+            </div>
+          </div>
+
+          {/* 3D Page Turn Flipping Leaf (CSS 3D Transform Leaf) */}
+          {isFlipping && (
+            <div className={`page-turning-flipper flipping-${flipDirection}`}>
+              <div className="paper-curl-shadow" />
+              <div className="flipper-face front-face">
+                <div className="page-running-header">
+                  <span>Section {currentChapter}</span>
+                  <span>Turning...</span>
+                </div>
+                <div style={{ margin: 'auto', textAlign: 'center', opacity: 0.35 }}>
+                  <BookOpen size={48} color="var(--ink-accent)" />
+                </div>
               </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* Section 4: 8-Semester BE Computer Engineering Curriculum */}
-      <section id="curriculum" className="vanguard-section" style={{ background: 'rgba(12, 15, 22, 0.7)' }}>
-        <div className="section-head-centered">
-          <div className="section-eyebrow">Structured Syllabi</div>
-          <h2 className="section-title-large">BE Computer Engineering Curriculum Hub</h2>
-          <p className="section-subtext-balanced">
-            Structured 8-semester course syllabi, lecture slides, lab manuals, and faculty digital materials.
-          </p>
-        </div>
-
-        <div className="curriculum-bento-grid max-w-5xl mx-auto">
-          <div
-            className="curriculum-bento-card"
-            onClick={() => onOpenAuth('register')}
-            style={{ cursor: 'pointer' }}
-            title="Click to view Semester I & II syllabus"
-          >
-            <div className="bento-badge">Year I • Semester I & II</div>
-            <h3>Foundational Engineering</h3>
-            <p>Calculus, Digital Logic, Programming in C, Basic Electrical, Physics, Engineering Drawing.</p>
-            <div className="bento-tags">
-              <span>MTH-101</span>
-              <span>ELX-112</span>
-              <span>CMP-103</span>
-              <span>ELE-110</span>
-            </div>
-          </div>
-
-          <div
-            className="curriculum-bento-card"
-            onClick={() => onOpenAuth('register')}
-            style={{ cursor: 'pointer' }}
-            title="Click to view Semester III & IV syllabus"
-          >
-            <div className="bento-badge">Year II • Semester III & IV</div>
-            <h3>Systems & Algorithmic Core</h3>
-            <p>Data Structures, Discrete Mathematics, Microprocessors, Object-Oriented Software Design.</p>
-            <div className="bento-tags">
-              <span>CMP-210</span>
-              <span>MTH-220</span>
-              <span>ELX-230</span>
-              <span>CMP-240</span>
-            </div>
-          </div>
-
-          <div
-            className="curriculum-bento-card"
-            onClick={() => onOpenAuth('register')}
-            style={{ cursor: 'pointer' }}
-            title="Click to view Semester V & VI syllabus"
-          >
-            <div className="bento-badge">Year III • Semester V & VI</div>
-            <h3>Advanced Computing Systems</h3>
-            <p>Operating Systems, Database Management, Computer Networks, Software Engineering, AI Theory.</p>
-            <div className="bento-tags">
-              <span>CMP-310</span>
-              <span>CMP-320</span>
-              <span>CMP-330</span>
-              <span>CMP-340</span>
-            </div>
-          </div>
-
-          <div
-            className="curriculum-bento-card"
-            onClick={() => onOpenAuth('register')}
-            style={{ cursor: 'pointer' }}
-            title="Click to view Semester VII & VIII syllabus"
-          >
-            <div className="bento-badge">Year IV • Semester VII & VIII</div>
-            <h3>Applied Engineering & Theses</h3>
-            <p>Distributed Systems, Cloud Architecture, Network Security, Final Year Capstone Research Project.</p>
-            <div className="bento-tags">
-              <span>CMP-410</span>
-              <span>CMP-420</span>
-              <span>PRJ-490</span>
-              <span>THS-499</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Massive Cinematic Call To Action with Grand Alcove Library Backdrop */}
-      <section className="vanguard-cta-section">
-        <div className="cta-backdrop-image-layer">
-          <img src="/Unilib.jpg" alt="Grand University Alcove Library" className="cta-library-backdrop-img" />
-          <div className="cta-backdrop-overlay" />
-        </div>
-        <div className="cta-content-shell max-w-3xl mx-auto text-center">
-          <div className="cta-eyebrow-pill">
-            <Sparkles size={13} color="var(--primary)" />
-            <span>Preserving Centuries of Heritage • Powering 2026 Academic Intelligence</span>
-          </div>
-          <h2 className="cta-headline-epic">
-            Experience Higher Learning <br />
-            With Living Intelligence.
-          </h2>
-          <p className="cta-subtext-epic">
-            Join scholars, faculty members, and university administrators on UniLib.
-          </p>
-
-          <div className="cta-action-row">
-            <button className="vanguard-cta-primary" onClick={() => onOpenAuth('register')}>
-              <span>Create Scholar Account</span>
-              <div className="btn-nested-icon">
-                <ArrowRight size={16} />
+              <div className="flipper-face back-face">
+                <div className="page-running-header">
+                  <span>Section {flipDirection === 'forward' ? currentChapter + 1 : currentChapter - 1}</span>
+                  <span>Unfolding...</span>
+                </div>
+                <div style={{ margin: 'auto', textAlign: 'center', opacity: 0.35 }}>
+                  <Bookmark size={48} color="var(--gold-accent)" />
+                </div>
               </div>
-            </button>
-            <button className="vanguard-cta-secondary" onClick={() => onOpenAuth('login')}>
-              <span>Administrative Portal</span>
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Vanguard Minimalist Footer */}
-      <footer className="vanguard-footer">
-        <div className="footer-container max-w-6xl mx-auto">
-          <div className="footer-brand-side">
-            <div className="footer-logo">
-              <Library size={20} color="var(--primary)" />
-              <span>UniLib</span>
             </div>
-            <p className="footer-tagline">
-              University Library & Research Archival Management System • Grounded in Real Academic Data.
-            </p>
-          </div>
-
-          <div className="footer-meta-side">
-            <span className="footer-badge-live">
-              <span className="live-dot" /> Live Academic Database
-            </span>
-            <span className="footer-copy">© 2026 UniLib Inc. All rights reserved.</span>
-          </div>
+          )}
         </div>
-      </footer>
+      </div>
+
+      {/* Chapter Page Navigation Controls (Arrows & Chapter Dots) */}
+      <div className="book-turn-controls">
+        <button
+          className="turn-arrow-btn"
+          onClick={() => turnToChapter(currentChapter - 1)}
+          disabled={currentChapter <= 1 || isFlipping}
+          title="Previous Page (←)"
+        >
+          <ChevronLeft size={20} />
+        </button>
+
+        <div className="chapter-indicators-row">
+          {[1, 2, 3, 4].map((ch) => (
+            <button
+              key={ch}
+              className={`chapter-dot-btn ${currentChapter === ch ? 'active' : ''}`}
+              onClick={() => turnToChapter(ch)}
+              disabled={isFlipping}
+              title={`Chapter ${ch}: ${ch === 1 ? 'Introduction' : ch === 2 ? 'Features' : ch === 3 ? 'How It Works' : 'Matriculation'}`}
+            />
+          ))}
+        </div>
+
+        <button
+          className="turn-arrow-btn"
+          onClick={() => turnToChapter(currentChapter + 1)}
+          disabled={currentChapter >= 4 || isFlipping}
+          title="Next Page (→)"
+        >
+          <ChevronRight size={20} />
+        </button>
+      </div>
     </div>
   );
 }
