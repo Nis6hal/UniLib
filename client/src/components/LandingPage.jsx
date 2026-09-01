@@ -2,45 +2,29 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Library,
   BookOpen,
-  FileText,
-  BellRing,
-  ShieldCheck,
   ArrowRight,
   Sparkles,
-  BookMarked,
-  Layers,
-  CalendarClock,
-  Receipt,
-  RotateCw,
-  FolderUp,
-  HelpCircle,
+  ShieldCheck,
   CheckCircle2,
-  Lock,
-  Search,
-  Bot,
-  BrainCircuit,
-  Share2,
-  FileCode,
-  Network,
-  Cpu,
-  GraduationCap,
-  Eye,
-  Sliders,
-  ExternalLink,
-  ChevronRight,
-  ChevronDown,
   Database,
-  Bookmark,
-  Award,
-  Zap,
-  Activity,
+  GraduationCap,
+  Bot,
+  ArrowUpRight,
+  Search,
   Compass,
-  ArrowUpRight
+  FileText,
+  Activity,
+  Layers,
+  ChevronRight,
+  Copy,
+  Terminal,
+  Clock,
+  BookMarked
 } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function LandingPage({ onOpenAuth }) {
-  // Live dynamic platform stats — 100% real database queries
+  // Live dynamic platform stats — real database query
   const [liveStats, setLiveStats] = useState({
     total_books: 20,
     total_copies: 40,
@@ -49,66 +33,74 @@ export default function LandingPage({ onOpenAuth }) {
     total_courses: 49,
     total_research_papers: 4,
     total_members: 15,
-    total_circulation_events: 17,
-    featured_books: []
+    total_circulation_events: 17
   });
-  const [loadingStats, setLoadingStats] = useState(true);
 
-  // Interactive Unified Search Simulation State
-  const [activeSearchCategory, setActiveSearchCategory] = useState('Computer Engineering');
-  const searchCategoriesData = {
+  // Interactive Live Search & Category State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('Computer Engineering');
+  const [liveBooks, setLiveBooks] = useState([]);
+  const [loadingSearch, setLoadingSearch] = useState(false);
+
+  // Default curated showcase items per category
+  const categoryHighlights = {
     'Computer Engineering': [
-      { type: 'Textbook', title: 'Pattern Recognition and Machine Learning', author: 'Christopher Bishop', tag: 'Physical (Available)', color: '#d4af37' },
-      { type: 'Peer-Reviewed Thesis', title: 'Attention Is All You Need: Transformer Models', author: 'Vaswani et al. (NeurIPS)', tag: 'DOI: 10.48550', color: '#38bdf8' },
-      { type: 'Journal Article', title: 'Deep Residual Learning for Image Recognition', author: 'He et al. (IEEE TPAMI)', tag: 'Vol 42, Issue 3', color: '#10b981' },
-      { type: 'Syllabus Course', title: 'CMP-310: Database Management Systems Core', author: 'Dept. of Computer Engineering', tag: 'Semester 5', color: '#f59e0b' }
+      { type: 'Textbook', title: 'Pattern Recognition and Machine Learning', author: 'Christopher Bishop', tag: 'Physical Copy • Available', color: '#d4af37' },
+      { type: 'Peer-Reviewed Thesis', title: 'Attention Is All You Need: Transformer Architecture', author: 'Vaswani et al. (NeurIPS)', tag: 'DOI: 10.48550', color: '#38bdf8' },
+      { type: 'Core Course', title: 'CMP-310: Database Management Systems', author: 'Dept. of Computer Engineering', tag: 'Semester V Syllabus', color: '#10b981' }
     ],
-    'Algorithms & Data Structures': [
-      { type: 'Textbook', title: 'Introduction to Algorithms (4th Edition)', author: 'Cormen, Leiserson, Rivest, Stein', tag: 'Physical Copy', color: '#d4af37' },
-      { type: 'Curriculum Resource', title: 'B+ Trees & Red-Black Tree Balancing Notes', author: 'Faculty of Computer Science', tag: 'CMP-210 Core', color: '#10b981' },
-      { type: 'Research Thesis', title: 'Cache-Oblivious Search Structures', author: 'Frigo & Demaine (FOCS)', tag: 'Landmark', color: '#38bdf8' }
+    'Algorithms & Systems': [
+      { type: 'Textbook', title: 'Introduction to Algorithms (CLRS 4th Ed.)', author: 'Cormen, Leiserson, Rivest, Stein', tag: 'Hardcover Available', color: '#d4af37' },
+      { type: 'Curriculum Resource', title: 'B+ Tree Indexing & Red-Black Balancing Notes', author: 'Faculty of Computer Science', tag: 'CMP-210 Core', color: '#10b981' },
+      { type: 'Research Thesis', title: 'Cache-Oblivious Search Structures', author: 'Frigo & Demaine (FOCS)', tag: 'Landmark Thesis', color: '#38bdf8' }
     ],
-    'Distributed Systems': [
-      { type: 'Textbook', title: 'Designing Data-Intensive Applications', author: 'Martin Kleppmann', tag: 'Physical Copy', color: '#d4af37' },
-      { type: 'Research Thesis', title: 'Spanner: Globally-Distributed Database Architecture', author: 'Corbett et al. (Google/OSDI)', tag: 'Peer-Reviewed', color: '#38bdf8' },
-      { type: 'Journal Article', title: 'In Search of an Understandable Consensus Algorithm (Raft)', author: 'Ongaro & Ousterhout (USENIX)', tag: 'Verified Citation', color: '#10b981' }
+    'Distributed Cloud': [
+      { type: 'Textbook', title: 'Designing Data-Intensive Applications', author: 'Martin Kleppmann', tag: 'Physical Available', color: '#d4af37' },
+      { type: 'Research Paper', title: 'Spanner: Google’s Globally Distributed Database', author: 'Corbett et al. (OSDI)', tag: 'Verified Citation', color: '#38bdf8' },
+      { type: 'Consensus Study', title: 'In Search of an Understandable Consensus Algorithm (Raft)', author: 'Ongaro & Ousterhout (USENIX)', tag: 'Peer-Reviewed', color: '#10b981' }
     ]
   };
 
-  // Interactive AI Study Assistant Sandbox State
+  // Live RAG Simulator Sandbox with Animated Typing Stream Simulation
   const [activeRagMode, setActiveRagMode] = useState('Deep Analysis');
-  const ragSimulations = {
+  const [copiedText, setCopiedText] = useState(false);
+
+  const ragScenarios = {
     'Deep Analysis': {
-      title: 'Deep Academic Synthesis • Relational Normalization & BCNF',
-      text: 'Normalization decomposes relational schemas to eliminate insertion, update, and deletion anomalies. Boyce-Codd Normal Form (BCNF) strictly requires that for every non-trivial functional dependency X -> Y, X must be a superkey. Unlike 3NF, BCNF resolves structural redundancies when multiple overlapping candidate keys exist.',
+      prompt: 'Synthesize the core distinction between 3NF and BCNF with functional dependencies.',
+      response: 'Boyce-Codd Normal Form (BCNF) strictly requires that for every non-trivial functional dependency X -> Y, X must be a superkey.\n\nUnlike 3NF (which permits dependency X -> A if A is a prime attribute belonging to candidate keys), BCNF disallows this. BCNF eliminates anomalies when multiple overlapping composite candidate keys exist.',
+      source: 'Silberschatz • Database System Concepts (6th Edition)',
       page: 42,
-      confidence: '99%',
-      badge: 'Verified Grounding'
+      confidence: '99.4%',
+      latency: '18ms'
     },
-    'Quick Summary': {
-      title: 'High-Yield Conceptual Digest',
-      text: '1. 1NF eliminates repeating groups and composite fields.\n2. 2NF removes partial key functional dependencies.\n3. 3NF removes transitive dependencies (X -> Y -> Z).\n4. BCNF enforces that every determinant is strictly a candidate key.',
-      page: 42,
-      confidence: '97%',
-      badge: 'Executive Digest'
+    'Quick Digest': {
+      prompt: 'Provide an executive 4-bullet digest of Relational Normalization stages.',
+      response: '1. 1NF: Atomic attributes; eliminates repeating groups and composite fields.\n2. 2NF: 1NF + eliminates partial key functional dependencies.\n3. 3NF: 2NF + eliminates transitive dependencies (X -> Y -> Z).\n4. BCNF: Every determinant is strictly a candidate superkey.',
+      source: 'Dept. of Computer Science • CMP-310 Lecture Decks',
+      page: 18,
+      confidence: '98.2%',
+      latency: '12ms'
     },
     'Exam Flashcard': {
-      title: 'Active-Recall Study Flashcard',
-      text: 'Prompt: What distinguishes BCNF from 3NF regarding candidate key determinants?\n\nAnswer: 3NF permits dependency X -> A if A is a prime attribute (part of any candidate key), whereas BCNF strictly disallows this unless X itself is a full superkey.',
-      page: 43,
-      confidence: '98%',
-      badge: 'Flashcard #14'
+      prompt: 'Generate an active-recall evaluation flashcard for Semester V Database Exam.',
+      response: 'PROMPT: Given relation R(A, B, C) with dependencies A -> B and B -> C, identify the highest normal form of R.\n\nANSWER: 2NF. Dependency B -> C represents a transitive dependency on candidate key A, violating 3NF condition.',
+      source: 'University Exam Vault • 2024 Past Papers Collection',
+      page: 89,
+      confidence: '99.1%',
+      latency: '15ms'
     },
     'Practice Quiz': {
-      title: 'Bloom\'s Taxonomy Evaluative Question',
-      text: 'Question: Given relation R(A, B, C) with dependencies A -> B and B -> C, in what highest normal form is R?\n\n[A] 1NF\n[B] 2NF (Correct — B -> C violates 3NF due to transitive dependency)\n[C] 3NF\n[D] BCNF',
-      page: 45,
-      confidence: '99%',
-      badge: 'Exam Grader'
+      prompt: 'Construct a Bloom\'s Taxonomy conceptual multiple-choice question.',
+      response: 'QUESTION: In write-ahead logging (WAL), why must the log record reach persistent storage before the corresponding dirty page is flushed to disk?\n\n[A] To minimize memory buffer overhead\n[B] To satisfy the Write-Ahead Logging Invariant for Atomicity and Durability (Correct)\n[C] To prevent lock deadlock contention',
+      source: 'Operating Systems & DB Engine Architecture • Chap. 14',
+      page: 312,
+      confidence: '99.8%',
+      latency: '22ms'
     }
   };
 
-  // Interactive Knowledge Graph Active Node State
+  // Interactive Knowledge Matrix Active Node State
   const [selectedGraphNode, setSelectedGraphNode] = useState('Databases');
   const graphNodes = [
     { id: 'Databases', label: 'Relational DBs', sub: '12 Volumes • 3NF/BCNF', x: 20, y: 35, color: '#d4af37' },
@@ -118,24 +110,50 @@ export default function LandingPage({ onOpenAuth }) {
     { id: 'Security', label: 'Network Security', sub: '5 Volumes • Crypto/TLS', x: 68, y: 80, color: '#ec4899' }
   ];
 
+  // Fetch Public Stats on load
   useEffect(() => {
     async function fetchStats() {
       try {
-        setLoadingStats(true);
         const data = await api.getPublicStats();
-        setLiveStats(data);
+        if (data) setLiveStats(data);
       } catch (err) {
         console.error('Failed to load public stats:', err);
-      } finally {
-        setLoadingStats(false);
       }
     }
     fetchStats();
   }, []);
 
+  // Handle live search
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setLiveBooks([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        setLoadingSearch(true);
+        const data = await api.getBooks(searchQuery);
+        setLiveBooks(data.slice(0, 4));
+      } catch (err) {
+        console.warn('Search query failed:', err);
+      } finally {
+        setLoadingSearch(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleCopySnippet = () => {
+    if (ragScenarios[activeRagMode]) {
+      navigator.clipboard.writeText(ragScenarios[activeRagMode].response);
+      setCopiedText(true);
+      setTimeout(() => setCopiedText(false), 2000);
+    }
+  };
+
   return (
     <div className="landing-page-vanguard">
-      {/* Fixed Majestic Library Background for Scroll-Reveal Effect */}
+      {/* Fixed Ambient Library Background Layer */}
       <div className="landing-hero-backdrop">
         <div className="landing-hero-backdrop-overlay" />
       </div>
@@ -147,7 +165,7 @@ export default function LandingPage({ onOpenAuth }) {
         <div className="ambient-orb orb-indigo" />
       </div>
 
-      {/* Floating Glass Island Navbar */}
+      {/* Floating Island Navigation Bar */}
       <nav className="vanguard-floating-nav">
         <div className="nav-brand-pill">
           <div className="nav-brand-icon">
@@ -160,7 +178,7 @@ export default function LandingPage({ onOpenAuth }) {
         <div className="nav-links-island">
           <a href="#discovery" className="nav-link-item">Catalog Discovery</a>
           <a href="#rag-engine" className="nav-link-item">Hybrid RAG</a>
-          <a href="#curriculum" className="nav-link-item">BE Curriculum</a>
+          <a href="#curriculum" className="nav-link-item">Curriculum Hub</a>
           <a href="#graph" className="nav-link-item">Knowledge Matrix</a>
         </div>
 
@@ -177,51 +195,24 @@ export default function LandingPage({ onOpenAuth }) {
         </div>
       </nav>
 
-      {/* Scenic Hero Viewport — Pure Immersive Architectural View */}
-      <section className="vanguard-hero-viewport">
-        <div className="hero-viewport-content">
+      {/* 1. Unified Focused Hero Viewport (Min-Height 100dvh, High Conversion, Value in 20 Words) */}
+      <section className="vanguard-hero-viewport" style={{ minHeight: '100dvh', justifyContent: 'center', paddingTop: '100px' }}>
+        <div className="hero-viewport-content" style={{ maxWidth: '940px' }}>
           <div className="hero-atmosphere-tag">
             <Sparkles size={13} color="var(--primary)" />
             <span>Digital Archive & Living Academic Sanctuary</span>
           </div>
 
-          <h1 className="hero-viewport-title">
-            UniLib
+          <h1 className="hero-viewport-title" style={{ fontSize: 'clamp(2.6rem, 5.5vw, 4.4rem)', lineHeight: 1.12, marginBottom: 14 }}>
+            The University Library, <br />
+            <span className="headline-gradient-shimmer">Reimagined for 2026.</span>
           </h1>
 
-          <p className="hero-viewport-subline">
-            University Research Archival & Knowledge Intelligence
-          </p>
-
-          <a href="#overview" className="hero-scroll-cue">
-            <span className="scroll-cue-text">Enter Archive</span>
-            <div className="scroll-cue-bubble">
-              <ChevronDown size={15} />
-            </div>
-          </a>
-        </div>
-      </section>
-
-      {/* Section: Platform Overview, Headline, CTAs & Quick Capsules */}
-      <section id="overview" className="vanguard-overview-section">
-        <div className="vanguard-overview-content max-w-5xl mx-auto text-center">
-          <div className="hero-eyebrow-pill animate-in">
-            <Sparkles size={13} color="var(--primary)" />
-            <span>Next-Generation University Knowledge Ecosystem</span>
-          </div>
-
-          <h2 className="overview-headline-cinematic animate-in">
-            The University Library, <br />
-            <span className="headline-gradient-shimmer">
-              Reimagined for 2026.
-            </span>
-          </h2>
-
-          <p className="overview-subtext-clean animate-in">
+          <p className="hero-viewport-subline" style={{ maxWidth: '640px', fontSize: '1.05rem', lineHeight: 1.6, color: 'var(--text-secondary)', marginBottom: 28 }}>
             Unifying physical book circulation, 8-semester BE computer curriculum, peer-reviewed research papers, and hybrid RAG study intelligence.
           </p>
 
-          <div className="hero-cta-group animate-in">
+          <div className="hero-cta-group" style={{ marginBottom: 32 }}>
             <button className="vanguard-cta-primary" onClick={() => onOpenAuth('register')}>
               <span>Access Library Portal</span>
               <div className="btn-nested-icon">
@@ -236,8 +227,8 @@ export default function LandingPage({ onOpenAuth }) {
             </a>
           </div>
 
-          {/* Live Platform Quick Capsules Matrix */}
-          <div className="hero-capsules-grid animate-in">
+          {/* Live Platform Quick Metric Capsules */}
+          <div className="hero-capsules-grid" style={{ marginBottom: 0 }}>
             <div className="hero-capsule-card" onClick={() => onOpenAuth('register')}>
               <div className="capsule-icon-wrap" style={{ color: '#d4af37' }}>
                 <BookOpen size={18} />
@@ -311,142 +302,299 @@ export default function LandingPage({ onOpenAuth }) {
         </div>
       </section>
 
-      {/* Section 1: Unified Academic Discovery Simulator */}
+      {/* 2. Interactive Unified Academic Discovery Simulator (With Real DB Live Search) */}
       <section id="discovery" className="vanguard-section">
         <div className="section-head-centered">
           <div className="section-eyebrow">Instant Cross-Catalog Index</div>
           <h2 className="section-title-large">Unified Academic Discovery</h2>
           <p className="section-subtext-balanced">
-            Search physical books, syllabus notes, research papers, and faculty theses through one indexed catalog.
+            Search physical books, syllabus lecture notes, and faculty theses through a single indexed database.
           </p>
         </div>
 
-        {/* Double-Bezel Search Simulator Card */}
         <div className="vanguard-double-bezel max-w-5xl mx-auto">
           <div className="double-bezel-inner">
+            {/* Live Interactive Search Input */}
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Search size={18} color="var(--primary)" />
+              <input
+                type="text"
+                placeholder="Try searching 'Operating Systems', 'Machine Learning', or 'Algorithms'..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  color: '#fff',
+                  fontSize: '0.94rem',
+                  width: '100%',
+                  fontFamily: 'var(--font-body)'
+                }}
+              />
+              {searchQuery && (
+                <button
+                  className="ghost"
+                  style={{ padding: '2px 8px', fontSize: '0.74rem', color: 'var(--text-muted)' }}
+                  onClick={() => setSearchQuery('')}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {/* Category Filter Pills */}
             <div className="sim-toolbar">
               <div className="sim-categories">
-                {Object.keys(searchCategoriesData).map((cat) => (
+                {Object.keys(categoryHighlights).map((cat) => (
                   <button
                     key={cat}
-                    className={`sim-cat-btn ${activeSearchCategory === cat ? 'active' : ''}`}
-                    onClick={() => setActiveSearchCategory(cat)}
+                    className={`sim-cat-btn ${activeCategory === cat && !searchQuery ? 'active' : ''}`}
+                    onClick={() => {
+                      setActiveCategory(cat);
+                      setSearchQuery('');
+                    }}
                   >
-                    <Search size={13} /> {cat}
+                    <BookMarked size={13} /> {cat}
                   </button>
                 ))}
               </div>
               <div className="sim-count-badge">
                 <Activity size={13} color="var(--primary)" />
-                <span>{searchCategoriesData[activeSearchCategory]?.length || 0} Indexed Items</span>
+                <span>
+                  {searchQuery ? `${liveBooks.length} Live Matches` : `${categoryHighlights[activeCategory]?.length} Highlighted Items`}
+                </span>
               </div>
             </div>
 
+            {/* Dynamic Results Grid */}
             <div className="sim-results-grid">
-              {searchCategoriesData[activeSearchCategory]?.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="sim-result-card"
-                  onClick={() => onOpenAuth('register')}
-                  title="Click to view full volume in catalog"
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className="sim-card-top">
-                    <span className="sim-type-badge" style={{ borderColor: `${item.color}40`, color: item.color }}>
-                      {item.type}
-                    </span>
-                    <span className="sim-tag-live">
-                      <CheckCircle2 size={12} color="var(--success)" /> {item.tag}
-                    </span>
+              {searchQuery ? (
+                loadingSearch ? (
+                  <div style={{ padding: '30px', textAlign: 'center', gridColumn: '1 / -1', color: 'var(--text-muted)' }}>
+                    Querying live academic catalog...
                   </div>
-                  <h4 className="sim-item-title">{item.title}</h4>
-                  <p className="sim-item-author">by {item.author}</p>
-                </div>
-              ))}
+                ) : liveBooks.length > 0 ? (
+                  liveBooks.map((b) => (
+                    <div
+                      key={b.id}
+                      className="sim-result-card"
+                      onClick={() => onOpenAuth('register')}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div className="sim-card-top">
+                        <span className="sim-type-badge" style={{ borderColor: 'rgba(212,175,55,0.4)', color: 'var(--primary)' }}>
+                          {b.genre || 'Academic Volume'}
+                        </span>
+                        <span className="sim-tag-live">
+                          <CheckCircle2 size={12} color="var(--success)" /> {b.available_copies > 0 ? `${b.available_copies} Available` : 'Reserved'}
+                        </span>
+                      </div>
+                      <h4 className="sim-item-title">{b.title}</h4>
+                      <p className="sim-item-author">by {b.author}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ padding: '30px', textAlign: 'center', gridColumn: '1 / -1', color: 'var(--text-muted)' }}>
+                    No exact title matches for "{searchQuery}". Showing category archives below.
+                  </div>
+                )
+              ) : (
+                categoryHighlights[activeCategory]?.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="sim-result-card"
+                    onClick={() => onOpenAuth('register')}
+                    title="Click to view full volume in catalog"
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <div className="sim-card-top">
+                      <span className="sim-type-badge" style={{ borderColor: `${item.color}40`, color: item.color }}>
+                        {item.type}
+                      </span>
+                      <span className="sim-tag-live">
+                        <CheckCircle2 size={12} color="var(--success)" /> {item.tag}
+                      </span>
+                    </div>
+                    <h4 className="sim-item-title">{item.title}</h4>
+                    <p className="sim-item-author">by {item.author}</p>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
       </section>
 
-      {/* Section 2: Hybrid Academic RAG Intelligence Sandbox */}
+      {/* 3. Hybrid Academic RAG Intelligence Terminal (Split-Console Architecture) */}
       <section id="rag-engine" className="vanguard-section" style={{ background: 'rgba(12, 15, 22, 0.7)' }}>
+        <div className="max-w-5xl mx-auto" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 32 }}>
+          <div>
+            <div className="section-eyebrow">Production-Grade Intelligence</div>
+            <h2 className="section-title-large" style={{ textAlign: 'left', marginBottom: 12 }}>
+              Hybrid BM25 + Semantic RAG Engine
+            </h2>
+            <p className="section-subtext-balanced" style={{ margin: 0, textAlign: 'left' }}>
+              Multi-stage retrieval combining BM25 lexical precision, dense N-gram vectors, Reciprocal Rank Fusion, and exact page citations.
+            </p>
+          </div>
+
+          <div className="vanguard-double-bezel">
+            <div className="double-bezel-inner rag-grid-container">
+              <div className="rag-sidebar-modes">
+                <div className="rag-sidebar-header">
+                  <Bot size={20} color="var(--primary)" />
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Synthesis Strategies</h4>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Multi-mode study engine</span>
+                  </div>
+                </div>
+
+                <div className="rag-mode-list">
+                  {Object.keys(ragScenarios).map((mode) => (
+                    <button
+                      key={mode}
+                      className={`rag-mode-pill ${activeRagMode === mode ? 'active' : ''}`}
+                      onClick={() => setActiveRagMode(mode)}
+                    >
+                      <Sparkles size={14} color="var(--primary)" />
+                      <span>{mode}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="rag-confidence-widget">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: 6 }}>
+                    <span>Grounding Confidence</span>
+                    <strong style={{ color: 'var(--success)' }}>{ragScenarios[activeRagMode]?.confidence}</strong>
+                  </div>
+                  <div className="confidence-track">
+                    <div className="confidence-fill" style={{ width: ragScenarios[activeRagMode]?.confidence }} />
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                    Latency: {ragScenarios[activeRagMode]?.latency} • Verified Citation
+                  </div>
+                </div>
+              </div>
+
+              <div className="rag-terminal-display">
+                <div className="terminal-header">
+                  <div className="terminal-badge">
+                    <Terminal size={14} color="var(--primary)" />
+                    <span>Query: {ragScenarios[activeRagMode]?.prompt}</span>
+                  </div>
+                  <button
+                    className="ghost"
+                    onClick={handleCopySnippet}
+                    style={{ padding: '4px 8px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: 4, color: copiedText ? 'var(--success)' : 'var(--text-muted)' }}
+                  >
+                    <Copy size={12} /> {copiedText ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+
+                <div className="terminal-content">
+                  <p className="terminal-text">
+                    {ragScenarios[activeRagMode]?.response}
+                  </p>
+                </div>
+
+                <div className="terminal-footer">
+                  <div className="footer-citation-note">
+                    <ShieldCheck size={14} color="var(--success)" />
+                    <span>Grounding: <strong>{ragScenarios[activeRagMode]?.source}</strong> (p. {ragScenarios[activeRagMode]?.page})</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. Structured Syllabi (Asymmetric Engineering Bento Grid) */}
+      <section id="curriculum" className="vanguard-section">
         <div className="section-head-centered">
-          <div className="section-eyebrow">Production-Grade Intelligence</div>
-          <h2 className="section-title-large">Hybrid BM25 + Semantic RAG Engine</h2>
+          <div className="section-eyebrow">Structured Syllabi</div>
+          <h2 className="section-title-large">BE Computer Engineering Curriculum Hub</h2>
           <p className="section-subtext-balanced">
-            Multi-stage retrieval combining BM25Okapi lexical precision, dense N-gram vectors, Reciprocal Rank Fusion, and exact page citations.
+            Structured 8-semester course syllabi, lecture slides, lab manuals, and faculty digital materials.
           </p>
         </div>
 
-        {/* Double-Bezel RAG Grid */}
-        <div className="vanguard-double-bezel max-w-5xl mx-auto">
-          <div className="double-bezel-inner rag-grid-container">
-            <div className="rag-sidebar-modes">
-              <div className="rag-sidebar-header">
-                <Bot size={20} color="var(--primary)" />
-                <div>
-                  <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Synthesis Strategies</h4>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Multi-mode study engine</span>
-                </div>
-              </div>
-
-              <div className="rag-mode-list">
-                {Object.keys(ragSimulations).map((mode) => (
-                  <button
-                    key={mode}
-                    className={`rag-mode-pill ${activeRagMode === mode ? 'active' : ''}`}
-                    onClick={() => setActiveRagMode(mode)}
-                  >
-                    <Sparkles size={14} color="var(--primary)" />
-                    <span>{mode}</span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="rag-confidence-widget">
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: 6 }}>
-                  <span>Grounding Reliability</span>
-                  <strong style={{ color: 'var(--success)' }}>{ragSimulations[activeRagMode]?.confidence}</strong>
-                </div>
-                <div className="confidence-track">
-                  <div className="confidence-fill" style={{ width: ragSimulations[activeRagMode]?.confidence }} />
-                </div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 6 }}>
-                  Source: Database System Concepts (Page {ragSimulations[activeRagMode]?.page})
-                </div>
-              </div>
+        <div className="curriculum-bento-grid max-w-5xl mx-auto">
+          {/* Featured Hero Bento Card (Year III / Core Systems) */}
+          <div
+            className="curriculum-bento-card"
+            onClick={() => onOpenAuth('register')}
+            style={{ gridColumn: '1 / -1', background: 'linear-gradient(135deg, rgba(212,175,55,0.06) 0%, rgba(15,22,35,0.95) 100%)', border: '1px solid rgba(212,175,55,0.3)', cursor: 'pointer' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div className="bento-badge" style={{ color: 'var(--primary)' }}>Featured • Year III • Semester V & VI</div>
+              <span className="badge badge-primary" style={{ fontSize: '0.72rem' }}>Core Engineering Track</span>
             </div>
+            <h3 style={{ fontSize: '1.45rem' }}>Advanced Computing Systems & Data Architecture</h3>
+            <p style={{ maxWidth: '780px', marginBottom: 18 }}>
+              Operating Systems, Database Management Systems, Computer Networks, Software Engineering, and AI Theory. Complete with verified laboratory manuals and reference textbooks.
+            </p>
+            <div className="bento-tags">
+              <span>CMP-310: Databases</span>
+              <span>CMP-320: Operating Systems</span>
+              <span>CMP-330: Computer Networks</span>
+              <span>CMP-340: Artificial Intelligence</span>
+            </div>
+          </div>
 
-            <div className="rag-terminal-display">
-              <div className="terminal-header">
-                <div className="terminal-badge">
-                  <ShieldCheck size={14} color="var(--primary)" />
-                  <span>{ragSimulations[activeRagMode]?.title}</span>
-                </div>
-                <span className="terminal-page-tag">
-                  Page {ragSimulations[activeRagMode]?.page} Verified
-                </span>
-              </div>
+          <div
+            className="curriculum-bento-card"
+            onClick={() => onOpenAuth('register')}
+            style={{ cursor: 'pointer' }}
+          >
+            <div className="bento-badge">Year I • Semester I & II</div>
+            <h3>Foundational Engineering</h3>
+            <p>Calculus, Digital Logic, Programming in C, Basic Electrical, Physics, Engineering Drawing.</p>
+            <div className="bento-tags">
+              <span>MTH-101</span>
+              <span>ELX-112</span>
+              <span>CMP-103</span>
+              <span>ELE-110</span>
+            </div>
+          </div>
 
-              <div className="terminal-content">
-                <p className="terminal-text">
-                  {ragSimulations[activeRagMode]?.text}
-                </p>
-              </div>
+          <div
+            className="curriculum-bento-card"
+            onClick={() => onOpenAuth('register')}
+            style={{ cursor: 'pointer' }}
+          >
+            <div className="bento-badge">Year II • Semester III & IV</div>
+            <h3>Systems & Algorithmic Core</h3>
+            <p>Data Structures, Discrete Mathematics, Microprocessors, Object-Oriented Software Design.</p>
+            <div className="bento-tags">
+              <span>CMP-210</span>
+              <span>MTH-220</span>
+              <span>ELX-230</span>
+              <span>CMP-240</span>
+            </div>
+          </div>
 
-              <div className="terminal-footer">
-                <div className="footer-citation-note">
-                  <Sparkles size={13} color="var(--primary)" />
-                  <span>Citations anchored with mathematical BM25 term coverage and Reciprocal Rank Fusion.</span>
-                </div>
-              </div>
+          <div
+            className="curriculum-bento-card"
+            onClick={() => onOpenAuth('register')}
+            style={{ gridColumn: '1 / -1', cursor: 'pointer' }}
+          >
+            <div className="bento-badge">Year IV • Semester VII & VIII</div>
+            <h3>Applied Engineering & Final Year Research Thesis</h3>
+            <p>Distributed Systems, Cloud Architecture, Network Security, and Final Year Capstone Research Project.</p>
+            <div className="bento-tags">
+              <span>CMP-410: Distributed Systems</span>
+              <span>CMP-420: Cloud Computing</span>
+              <span>PRJ-490: Project I</span>
+              <span>THS-499: Capstone Thesis</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Section 3: Interactive Academic Knowledge Matrix */}
-      <section id="graph" className="vanguard-section">
+      {/* 5. Interactive Academic Knowledge Matrix */}
+      <section id="graph" className="vanguard-section" style={{ background: 'rgba(12, 15, 22, 0.7)' }}>
         <div className="section-head-centered">
           <div className="section-eyebrow">Semantic Subject Mesh</div>
           <h2 className="section-title-large">Interactive Academic Knowledge Matrix</h2>
@@ -483,7 +631,6 @@ export default function LandingPage({ onOpenAuth }) {
               ))}
             </div>
 
-            {/* Dynamic Selected Node Intelligence Card */}
             {selectedGraphNode && (
               <div style={{
                 position: 'absolute',
@@ -531,88 +678,7 @@ export default function LandingPage({ onOpenAuth }) {
         </div>
       </section>
 
-      {/* Section 4: 8-Semester BE Computer Engineering Curriculum */}
-      <section id="curriculum" className="vanguard-section" style={{ background: 'rgba(12, 15, 22, 0.7)' }}>
-        <div className="section-head-centered">
-          <div className="section-eyebrow">Structured Syllabi</div>
-          <h2 className="section-title-large">BE Computer Engineering Curriculum Hub</h2>
-          <p className="section-subtext-balanced">
-            Structured 8-semester course syllabi, lecture slides, lab manuals, and faculty digital materials.
-          </p>
-        </div>
-
-        <div className="curriculum-bento-grid max-w-5xl mx-auto">
-          <div
-            className="curriculum-bento-card"
-            onClick={() => onOpenAuth('register')}
-            style={{ cursor: 'pointer' }}
-            title="Click to view Semester I & II syllabus"
-          >
-            <div className="bento-badge">Year I • Semester I & II</div>
-            <h3>Foundational Engineering</h3>
-            <p>Calculus, Digital Logic, Programming in C, Basic Electrical, Physics, Engineering Drawing.</p>
-            <div className="bento-tags">
-              <span>MTH-101</span>
-              <span>ELX-112</span>
-              <span>CMP-103</span>
-              <span>ELE-110</span>
-            </div>
-          </div>
-
-          <div
-            className="curriculum-bento-card"
-            onClick={() => onOpenAuth('register')}
-            style={{ cursor: 'pointer' }}
-            title="Click to view Semester III & IV syllabus"
-          >
-            <div className="bento-badge">Year II • Semester III & IV</div>
-            <h3>Systems & Algorithmic Core</h3>
-            <p>Data Structures, Discrete Mathematics, Microprocessors, Object-Oriented Software Design.</p>
-            <div className="bento-tags">
-              <span>CMP-210</span>
-              <span>MTH-220</span>
-              <span>ELX-230</span>
-              <span>CMP-240</span>
-            </div>
-          </div>
-
-          <div
-            className="curriculum-bento-card"
-            onClick={() => onOpenAuth('register')}
-            style={{ cursor: 'pointer' }}
-            title="Click to view Semester V & VI syllabus"
-          >
-            <div className="bento-badge">Year III • Semester V & VI</div>
-            <h3>Advanced Computing Systems</h3>
-            <p>Operating Systems, Database Management, Computer Networks, Software Engineering, AI Theory.</p>
-            <div className="bento-tags">
-              <span>CMP-310</span>
-              <span>CMP-320</span>
-              <span>CMP-330</span>
-              <span>CMP-340</span>
-            </div>
-          </div>
-
-          <div
-            className="curriculum-bento-card"
-            onClick={() => onOpenAuth('register')}
-            style={{ cursor: 'pointer' }}
-            title="Click to view Semester VII & VIII syllabus"
-          >
-            <div className="bento-badge">Year IV • Semester VII & VIII</div>
-            <h3>Applied Engineering & Theses</h3>
-            <p>Distributed Systems, Cloud Architecture, Network Security, Final Year Capstone Research Project.</p>
-            <div className="bento-tags">
-              <span>CMP-410</span>
-              <span>CMP-420</span>
-              <span>PRJ-490</span>
-              <span>THS-499</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Massive Cinematic Call To Action with Grand Alcove Library Backdrop */}
+      {/* 6. Grand Alcove Library Call To Action Section */}
       <section className="vanguard-cta-section">
         <div className="cta-backdrop-image-layer">
           <img src="/Unilib.jpg" alt="Grand University Alcove Library" className="cta-library-backdrop-img" />
