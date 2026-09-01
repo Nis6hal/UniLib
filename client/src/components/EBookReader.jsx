@@ -449,7 +449,8 @@ export default function EBookReader({ currentUser, initialBook }) {
 
   const openReader = async (book) => {
     setActiveReadingBook(book);
-    setReaderViewMode(book.file_type === 'pdf' ? 'pdf' : 'document');
+    const isPdf = book.file_type === 'pdf';
+    setReaderViewMode(isPdf ? 'pdf' : 'document');
     setReaderZoom(100);
     setBookContent(null);
     setCurrentPage(1);
@@ -458,7 +459,7 @@ export default function EBookReader({ currentUser, initialBook }) {
     setSearchInBook('');
     setSearchResults([]);
 
-    // Fetch compact content
+    // Fetch compact paginated content
     setContentLoading(true);
     try {
       const res = await api.getEBookContent(book.id, currentUser?.id);
@@ -474,7 +475,6 @@ export default function EBookReader({ currentUser, initialBook }) {
         setActiveReadingBook((prev) => ({ ...prev, ...res.book }));
       }
     } catch (err) {
-      // Content extraction failed — reader will show fallback
       console.warn('Content extraction unavailable:', err.message);
     } finally {
       setContentLoading(false);
@@ -498,10 +498,15 @@ export default function EBookReader({ currentUser, initialBook }) {
     return bookContent.pages.find(p => p.page === currentPage) || bookContent.pages[0] || null;
   };
 
-  // Keyboard navigation in reader
+  // Keyboard navigation in reader (only when reading paginated document mode)
   useEffect(() => {
-    if (!activeReadingBook) return;
+    if (!activeReadingBook || readerViewMode === 'pdf') return;
     const handleKeyDown = (e) => {
+      if (
+        document.activeElement.tagName === 'INPUT' ||
+        document.activeElement.tagName === 'TEXTAREA'
+      ) return;
+
       if (e.key === 'ArrowRight' || e.key === 'PageDown') {
         e.preventDefault();
         goToPage(currentPage + 1);
@@ -520,7 +525,7 @@ export default function EBookReader({ currentUser, initialBook }) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeReadingBook, currentPage, totalPages, goToPage]);
+  }, [activeReadingBook, readerViewMode, currentPage, totalPages, goToPage]);
 
   const progressPct = totalPages > 0 ? Math.round((currentPage / totalPages) * 100) : 0;
 

@@ -6,6 +6,82 @@ import re
 CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads', '.cache')
 os.makedirs(CACHE_DIR, exist_ok=True)
 
+
+def extract_docx_pages(file_path, words_per_page=350):
+    """
+    Extract text and TOC from a .docx file using python-docx.
+    Falls back gracefully if the library is missing.
+    """
+    pages_data = []
+    toc = []
+
+    try:
+        from docx import Document
+        doc = Document(file_path)
+    except ImportError:
+        pages_data = [{
+            "page_number": 1,
+            "text": "[python-docx is not installed. Install it with: pip install python-docx]",
+            "word_count": 12
+        }]
+        return pages_data, toc
+    except Exception as e:
+        pages_data = [{
+            "page_number": 1,
+            "text": f"[Unable to open DOCX file: {e}]",
+            "word_count": 8
+        }]
+        return pages_data, toc
+
+    current_page_paragraphs = []
+    current_words = 0
+    page_num = 1
+
+    HEADING_STYLES = {'heading 1', 'heading 2', 'heading 3', 'title'}
+
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if not text:
+            continue
+
+        style_name = (para.style.name or '').lower()
+        is_heading = style_name in HEADING_STYLES
+
+        # Detect headings for TOC
+        if is_heading and len(text) < 120:
+            toc.append({"title": text, "page": page_num})
+
+        p_words = len(text.split())
+
+        if current_words + p_words > words_per_page and current_page_paragraphs:
+            pages_data.append({
+                "page_number": page_num,
+                "text": "\n\n".join(current_page_paragraphs),
+                "word_count": current_words
+            })
+            page_num += 1
+            current_page_paragraphs = [text]
+            current_words = p_words
+        else:
+            current_page_paragraphs.append(text)
+            current_words += p_words
+
+    if current_page_paragraphs:
+        pages_data.append({
+            "page_number": page_num,
+            "text": "\n\n".join(current_page_paragraphs),
+            "word_count": current_words
+        })
+
+    if not pages_data:
+        pages_data = [{
+            "page_number": 1,
+            "text": "[This DOCX document appears to be empty or contains only images/tables.]",
+            "word_count": 10
+        }]
+
+    return pages_data, toc
+
 def extract_pdf_pages(file_path):
     pages_data = []
     toc = []
@@ -142,6 +218,8 @@ def get_compact_book_content(book_id, file_path, file_type, title="", author="")
         ext = file_type.lower() if file_type else 'pdf'
         if ext == 'pdf':
             pages_data, toc = extract_pdf_pages(file_path)
+        elif ext == 'docx':
+            pages_data, toc = extract_docx_pages(file_path)
         else:
             pages_data, toc = extract_text_pages(file_path)
 

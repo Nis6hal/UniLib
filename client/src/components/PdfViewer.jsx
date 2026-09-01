@@ -157,8 +157,6 @@ export default function PdfViewer({
           textLayerDiv.innerHTML = "";
           textLayerDiv.style.width = `${viewport.width}px`;
           textLayerDiv.style.height = `${viewport.height}px`;
-          textLayerDiv.style.left = canvas.offsetLeft + "px";
-          textLayerDiv.style.top = canvas.offsetTop + "px";
 
           const textContent = await page.getTextContent();
           const textLayer = new pdfjsLib.TextLayer({
@@ -331,9 +329,14 @@ export default function PdfViewer({
         );
         if (visibleEntry) {
           const pageNum = parseInt(visibleEntry.target.getAttribute("data-page"));
-          if (pageNum && pageNum !== currentPage) {
-            setCurrentPage(pageNum);
-            setPageInput(pageNum.toString());
+          if (pageNum) {
+            setCurrentPage((prev) => {
+              if (prev !== pageNum) {
+                setPageInput(pageNum.toString());
+                return pageNum;
+              }
+              return prev;
+            });
           }
         }
       },
@@ -344,7 +347,7 @@ export default function PdfViewer({
     pageElements.forEach((el) => observer.observe(el));
 
     return () => observer.disconnect();
-  }, [viewMode, pdfDoc, currentPage]);
+  }, [viewMode, pdfDoc]);
 
   if (loading) {
     return (
@@ -561,6 +564,7 @@ export default function PdfViewer({
 }
 
 function PdfPageItem({ pageNum, renderPage, scale, dimensions }) {
+  const itemRef = useRef(null);
   const canvasRef = useRef(null);
   const textLayerRef = useRef(null);
   const [isVisible, setIsVisible] = useState(false);
@@ -575,7 +579,7 @@ function PdfPageItem({ pageNum, renderPage, scale, dimensions }) {
       },
       { threshold: 0.05 }
     );
-    if (canvasRef.current) observer.observe(canvasRef.current);
+    if (itemRef.current) observer.observe(itemRef.current);
     return () => observer.disconnect();
   }, []);
 
@@ -587,6 +591,7 @@ function PdfPageItem({ pageNum, renderPage, scale, dimensions }) {
 
   return (
     <div
+      ref={itemRef}
       className="pdf-page-item"
       data-page={pageNum}
       style={{
