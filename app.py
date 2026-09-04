@@ -9,7 +9,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from flask import Flask, request, jsonify, send_from_directory, send_file, g
+from flask import Flask, request, jsonify, send_from_directory, send_file, g, Response, stream_with_context
 from server.rag_engine import rag_engine
 from server.ebook_processor import get_compact_book_content
 from server.gemini_service import gemini_service
@@ -337,6 +337,40 @@ def init_db():
         content TEXT NOT NULL,
         token_count INTEGER DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS document_chunks_v2 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_id INTEGER NOT NULL,
+        course_id INTEGER,
+        parent_chunk_id INTEGER,
+        chunk_type TEXT NOT NULL DEFAULT 'child' CHECK(chunk_type IN ('parent', 'child')),
+        page_number INTEGER NOT NULL DEFAULT 1,
+        slide_number INTEGER,
+        section_title TEXT,
+        content TEXT NOT NULL,
+        token_count INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (document_id) REFERENCES digital_books(id) ON DELETE CASCADE,
+        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE SET NULL,
+        FOREIGN KEY (parent_chunk_id) REFERENCES document_chunks_v2(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS chunk_embeddings (
+        chunk_id INTEGER PRIMARY KEY,
+        embedding_model TEXT NOT NULL DEFAULT 'tfidf-norm-384',
+        dimensions INTEGER NOT NULL DEFAULT 384,
+        embedding_blob BLOB NOT NULL,
+        FOREIGN KEY (chunk_id) REFERENCES document_chunks_v2(id) ON DELETE CASCADE
+    );
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
+        content,
+        tokenize = 'porter unicode61'
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_chunks_v2_doc_page ON document_chunks_v2(document_id, page_number);
+    CREATE INDEX IF NOT EXISTS idx_chunks_v2_course ON document_chunks_v2(course_id);
+    CREATE INDEX IF NOT EXISTS idx_chunks_v2_parent ON document_chunks_v2(parent_chunk_id);
 
     CREATE TABLE IF NOT EXISTS reading_progress (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2486,6 +2520,164 @@ def rag_flashcards():
     # 2. Fallback to Local Active-Recall Generator
     flashcards = rag_engine.generate_flashcards(chunks, book_title=book_title)
     return jsonify({"flashcards": flashcards, "book_title": book_title, "provider": "local"})
+
+
+# ── UniLib v2 Multi-Document Cross-Curriculum RAG ─────────────────────────────
+@app.route('/api/rag/ask-course', methods=['POST'])
+def rag_ask_course():
+    """
+    UniLib v2 Multi-Document Cross-Curriculum Intelligence Route:
+    Synthesizes academic answers across all course-mapped textbooks, lecture decks,
+    notes, and research references simultaneously.
+    """
+    d = request.json or {}
+    course_id = d.get('course_id')
+    semester = d.get('semester')
+    query = (d.get('query') or '').strip()
+    mode = (d.get('mode') or 'deep_analysis').strip()
+
+    if not query:
+        return jsonify({"error": "Query required"}), 400
+
+    course_name = "Course Curriculum"
+    if course_id:
+        c_row = q("SELECT code, name FROM courses WHERE id=?", (course_id,), one=True)
+        if c_row:
+            course_name = f"{c_row['code']}: {c_row['name']}"
+
+    # 1. Fetch chunks directly mapped to this course or semester
+    sql = """
+    SELECT c.id, c.page_number, c.slide_number, c.content, b.title as doc_title, b.file_type as doc_type
+    FROM document_chunks_v2 c
+    JOIN digital_books b ON c.document_id = b.id
+    WHERE 1=1
+    """
+    params = []
+    if course_id:
+        sql += " AND c.course_id = ?"
+        params.append(course_id)
+
+    db_chunks = q(sql, tuple(params))
+    candidate_chunks = rows_to_list(db_chunks) if db_chunks else []
+
+    # 2. If no chunks pre-indexed in document_chunks_v2, dynamically gather from mapped digital books
+    if not candidate_chunks:
+        mapped_books = []
+        if course_id:
+            m_rows = q("SELECT resource_id FROM course_resources WHERE course_id=? AND resource_type IN ('book', 'digital')", (course_id,))
+            book_ids = [r['resource_id'] for r in m_rows]
+            if book_ids:
+                placeholders = ",".join("?" * len(book_ids))
+                mapped_books = q(f"SELECT * FROM digital_books WHERE id IN ({placeholders})", tuple(book_ids))
+
+        # If still none mapped, gather top relevant digital books
+        if not mapped_books:
+            mapped_books = q("SELECT * FROM digital_books LIMIT 3")
+
+        for b in (mapped_books or []):
+            b_path = os.path.join(app.config['UPLOAD_FOLDER'], b['file_path'])
+            content_data = get_compact_book_content(
+                book_id=b['id'],
+                file_path=b_path,
+                file_type=b['file_type'],
+                title=b['title'],
+                author=b['author']
+            )
+            for p in content_data.get('pages', [])[:20]: # sample up to 20 pages per doc
+                txt = p.get('text', '').strip()
+                if len(txt) > 25:
+                    # Hierarchical child chunks
+                    h_res = rag_engine.chunk_document_hierarchical(txt, page_number=p.get('page_number', 1))
+                    for parent in h_res:
+                        for child in parent['children']:
+                            candidate_chunks.append({
+                                "id": len(candidate_chunks) + 1,
+                                "page_number": child['page_number'],
+                                "slide_number": None,
+                                "doc_title": b['title'],
+                                "doc_type": b.get('genre') or 'Textbook',
+                                "content": child['content']
+                            })
+
+    if not candidate_chunks:
+        return jsonify({
+            "answer": f"### ⚠️ No Course Materials Indexed\n\nNo books or lecture notes have been mapped to **{course_name}** yet.\n\nGo to the **Curriculum Hub** to link textbooks or upload lecture slides to this course.",
+            "confidence": 0.0,
+            "sources": [],
+            "mode": mode,
+            "cluster_count": 0
+        })
+
+    # Synthesize across multiple documents
+    result = rag_engine.answer_cross_document(query, candidate_chunks, context_title=course_name, mode=mode)
+    result["course_name"] = course_name
+    return jsonify(result)
+
+
+@app.route('/api/rag/stream', methods=['POST'])
+def rag_stream():
+    """
+    UniLib v2 Server-Sent Events (SSE) Streaming Endpoint:
+    Streams word-by-word synthesized tokens for real-time pedagogical typing.
+    """
+    import json
+    import time
+
+    d = request.json or {}
+    query = (d.get('query') or '').strip()
+    course_id = d.get('course_id')
+    mode = (d.get('mode') or 'deep_analysis').strip()
+
+    def generate_sse():
+        # Quick fallback simulation if empty
+        if not query:
+            yield f"data: {json.dumps({'error': 'Query required'})}\n\n"
+            return
+
+        # Query the cross-document engine
+        course_name = "Course Curriculum"
+        if course_id:
+            c_row = q("SELECT code, name FROM courses WHERE id=?", (course_id,), one=True)
+            if c_row:
+                course_name = f"{c_row['code']}: {c_row['name']}"
+
+        # Fetch sample text from digital books
+        candidate_chunks = []
+        books = q("SELECT * FROM digital_books LIMIT 3")
+        for b in (books or []):
+            b_path = os.path.join(app.config['UPLOAD_FOLDER'], b['file_path'])
+            content_data = get_compact_book_content(
+                book_id=b['id'],
+                file_path=b_path,
+                file_type=b['file_type'],
+                title=b['title'],
+                author=b['author']
+            )
+            for p in content_data.get('pages', [])[:12]:
+                txt = p.get('text', '').strip()
+                if len(txt) > 25:
+                    candidate_chunks.append({
+                        "id": len(candidate_chunks) + 1,
+                        "page_number": p.get('page_number', 1),
+                        "doc_title": b['title'],
+                        "doc_type": 'Textbook',
+                        "content": txt[:250]
+                    })
+
+        res = rag_engine.answer_cross_document(query, candidate_chunks, context_title=course_name, mode=mode)
+        full_text = res.get('answer', '')
+
+        # Tokenize words to stream
+        words = full_text.split(' ')
+        for i, w in enumerate(words):
+            token = w + (' ' if i < len(words) - 1 else '')
+            yield f"data: {json.dumps({'token': token})}\n\n"
+            time.sleep(0.012) # smooth natural typing cadence
+
+        # Send final completion event with verified sources
+        yield f"data: {json.dumps({'done': True, 'sources': res.get('sources', []), 'confidence': res.get('confidence', 0.9)})}\n\n"
+
+    return Response(stream_with_context(generate_sse()), mimetype='text/event-stream')
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────

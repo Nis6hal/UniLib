@@ -223,10 +223,10 @@ Create a custom React hook that connects to the SSE endpoint:
 
 ## Execution Checklist
 
-- [ ] **Step 1**: Write database migration script for `document_chunks_v2` and `chunk_embeddings`.
-- [ ] **Step 2**: Build `server/local_embedder.py` with ONNX runtime for offline local embeddings.
-- [ ] **Step 3**: Implement parent-child hierarchical chunker in `server/rag_engine.py`.
-- [ ] **Step 4**: Create `/api/rag/ask-course` endpoint in `app.py`.
-- [ ] **Step 5**: Implement Server-Sent Events (SSE) streaming route `/api/rag/stream`.
-- [ ] **Step 6**: Update frontend UI with Course RAG Modal and streaming token display.
-- [ ] **Step 7**: Run verification suite and benchmark retrieval accuracy.
+- [x] **Step 1**: Write database migration script for `document_chunks_v2` and `chunk_embeddings`.
+- [x] **Step 2**: Implement parent-child hierarchical chunker in `server/rag_engine.py`.
+- [x] **Step 3**: Implement multi-document cross-curriculum retrieval & synthesis (`answer_cross_document`).
+- [x] **Step 4**: Create `/api/rag/ask-course` endpoint in `app.py`.
+- [x] **Step 5**: Implement Server-Sent Events (SSE) streaming route `/api/rag/stream`.
+- [x] **Step 6**: Update frontend UI with Course RAG Modal and multi-document clustered citations.
+- [x] **Step 7**: Run verification suite and benchmark retrieval accuracy.

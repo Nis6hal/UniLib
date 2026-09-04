@@ -21,7 +21,9 @@ import {
   CheckCircle2,
   Library,
   FolderUp,
-  UploadCloud
+  UploadCloud,
+  Bot,
+  Terminal
 } from 'lucide-react';
 
 export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavigateToReader }) {
@@ -54,6 +56,33 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
   const [folderCourseMode, setFolderCourseMode] = useState('auto'); // 'auto' | 'existing'
   const [selectedFolderCourseId, setSelectedFolderCourseId] = useState('');
   const folderInputRef = useRef(null);
+
+  // Course-Wide RAG Intelligence Assistant state (UniLib v2)
+  const [showCourseRagModal, setShowCourseRagModal] = useState(false);
+  const [courseRagQuery, setCourseRagQuery] = useState('');
+  const [courseRagMode, setCourseRagMode] = useState('deep_analysis');
+  const [courseRagLoading, setCourseRagLoading] = useState(false);
+  const [courseRagResult, setCourseRagResult] = useState(null);
+
+  const handleAskCourse = async (e) => {
+    e?.preventDefault();
+    if (!courseRagQuery.trim() || !selectedCourse) return;
+    try {
+      setCourseRagLoading(true);
+      setCourseRagResult(null);
+      const res = await api.ragAskCourse({
+        course_id: selectedCourse.id,
+        semester: selectedCourse.semester,
+        query: courseRagQuery,
+        mode: courseRagMode
+      });
+      setCourseRagResult(res);
+    } catch (err) {
+      addToast(err.message || 'Course RAG Query failed', 'error');
+    } finally {
+      setCourseRagLoading(false);
+    }
+  };
 
   // Form states
   const [courseForm, setCourseForm] = useState({
@@ -355,11 +384,26 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
               <ArrowLeft size={16} /> Back to All Subjects
             </button>
 
-            {isStaff && (
-              <button onClick={() => setShowMapModal(true)}>
-                <Plus size={15} /> Link / Upload Course Resource
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  setShowCourseRagModal(true);
+                  setCourseRagQuery('');
+                  setCourseRagResult(null);
+                }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: '0.85rem', background: 'linear-gradient(135deg, #d4af37, #b8860b)', color: '#000', fontWeight: 600 }}
+              >
+                <Bot size={16} /> Ask Course Intelligence (RAG)
               </button>
-            )}
+
+              {isStaff && (
+                <button onClick={() => setShowMapModal(true)}>
+                  <Plus size={15} /> Link / Upload Course Resource
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="card" style={{ padding: '36px 32px', marginBottom: 30 }}>
@@ -888,6 +932,133 @@ export default function CourseCurriculum({ currentUser, onNavigateToBook, onNavi
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* UniLib v2: Multi-Document Course Intelligence Modal */}
+      {showCourseRagModal && selectedCourse && (
+        <div className="modal-overlay" onClick={() => setShowCourseRagModal(false)}>
+          <div
+            className="modal"
+            style={{ maxWidth: 840, width: '92%', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 16, marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'linear-gradient(135deg, #d4af37, #b8860b)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000' }}>
+                  <Bot size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontFamily: 'var(--font-display)' }}>
+                    Course Intelligence Mesh (v2)
+                  </h3>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    Cross-referencing {selectedCourse.code}: {selectedCourse.name}
+                  </span>
+                </div>
+              </div>
+              <button className="ghost" onClick={() => setShowCourseRagModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Query Form */}
+            <form onSubmit={handleAskCourse} style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+                <input
+                  type="text"
+                  placeholder={`Ask anything across all ${selectedCourse.code} textbooks, notes & past exams...`}
+                  value={courseRagQuery}
+                  onChange={(e) => setCourseRagQuery(e.target.value)}
+                  style={{ flex: 1, padding: '10px 14px', fontSize: '0.92rem' }}
+                  autoFocus
+                />
+                <button
+                  type="submit"
+                  disabled={courseRagLoading || !courseRagQuery.trim()}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 130, justifyContent: 'center' }}
+                >
+                  <Sparkles size={15} />
+                  {courseRagLoading ? 'Synthesizing...' : 'Synthesize'}
+                </button>
+              </div>
+
+              {/* Mode Selection */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Synthesis Strategy:
+                </span>
+                {[
+                  { id: 'deep_analysis', label: 'Deep Technical Analysis' },
+                  { id: 'quick_summary', label: 'High-Yield Exam Digest' }
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className={`badge ${courseRagMode === m.id ? 'badge-primary' : 'badge-info'}`}
+                    onClick={() => setCourseRagMode(m.id)}
+                    style={{ cursor: 'pointer', padding: '4px 10px', fontSize: '0.74rem' }}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </form>
+
+            {/* Result Area */}
+            <div style={{ flex: 1, overflowY: 'auto', background: '#0a0c10', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 18 }}>
+              {courseRagLoading ? (
+                <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                  <Spinner />
+                  <p style={{ marginTop: 14, fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+                    Scanning all course textbooks, syllabus slides, and lab manuals...
+                  </p>
+                </div>
+              ) : courseRagResult ? (
+                <div>
+                  {/* Synthesis Text */}
+                  <div style={{ fontSize: '0.9rem', lineHeight: 1.65, color: 'var(--text-main)', whiteSpace: 'pre-wrap', marginBottom: 20 }}>
+                    {courseRagResult.answer}
+                  </div>
+
+                  {/* Multi-Document Clustered Citations */}
+                  {courseRagResult.sources && courseRagResult.sources.length > 0 && (
+                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+                      <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--primary)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <CheckCircle2 size={14} color="var(--success)" /> Verified Cross-Document Citations ({courseRagResult.sources.length})
+                      </h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
+                        {courseRagResult.sources.map((src, i) => (
+                          <div
+                            key={i}
+                            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 10 }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--primary)', marginBottom: 4 }}>
+                              <span>{src.doc_type || 'Textbook'}</span>
+                              <span>Pg. {src.page}</span>
+                            </div>
+                            <strong style={{ fontSize: '0.82rem', color: '#fff', display: 'block', marginBottom: 4 }}>
+                              {src.doc_title}
+                            </strong>
+                            <p style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                              "{src.excerpt}"
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '36px 0', color: 'var(--text-muted)' }}>
+                  <Terminal size={32} style={{ opacity: 0.4, margin: '0 auto 12px' }} />
+                  <p style={{ margin: 0, fontSize: '0.88rem' }}>
+                    Type a query above to synthesize answers across all textbooks, slides, and syllabus notes linked to {selectedCourse.code}.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

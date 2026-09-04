@@ -149,6 +149,7 @@ export const api = {
   ragAsk: (data) => request('/rag/ask', { method: 'POST', body: JSON.stringify(data) }),
   ragQuiz: (data) => request('/rag/quiz', { method: 'POST', body: JSON.stringify(data) }),
   ragFlashcards: (data) => request('/rag/flashcards', { method: 'POST', body: JSON.stringify(data) }),
+  ragAskCourse: (data) => request('/rag/ask-course', { method: 'POST', body: JSON.stringify(data) }),
 
   // ── Analytics & System ──
   getStats: (userId) => request(`/stats${userId ? `?user_id=${userId}` : ''}`),

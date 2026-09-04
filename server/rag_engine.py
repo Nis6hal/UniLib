@@ -87,6 +87,86 @@ class DocumentRAGEngine:
 
         return chunks
 
+    def chunk_document_hierarchical(self, text, page_number=1, parent_size=1600, child_size=400, child_overlap=80):
+        """
+        UniLib v2 Hierarchical Chunking:
+        Generates large coherent Parent chunks (for high-yield context synthesis)
+        paired with focused Child chunks (for high-precision semantic & lexical retrieval).
+        """
+        paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
+        if not paragraphs:
+            paragraphs = [text.strip()] if text.strip() else []
+
+        parent_groups = []
+        curr_parent = []
+        curr_len = 0
+        current_page = page_number
+
+        for p in paragraphs:
+            p_match = re.search(r'\[?(?:Page|Pg)\.?\s*(\d+)\]?', p, re.IGNORECASE)
+            if p_match:
+                try:
+                    current_page = int(p_match.group(1))
+                except Exception:
+                    pass
+
+            if curr_len + len(p) <= parent_size:
+                curr_parent.append(p)
+                curr_len += len(p)
+            else:
+                if curr_parent:
+                    parent_groups.append(("\n\n".join(curr_parent), current_page))
+                curr_parent = [p]
+                curr_len = len(p)
+
+        if curr_parent:
+            parent_groups.append(("\n\n".join(curr_parent), current_page))
+
+        hierarchical_result = []
+
+        for p_idx, (p_text, p_page) in enumerate(parent_groups):
+            p_tokens = self.tokenize(p_text)
+            parent_obj = {
+                "chunk_type": "parent",
+                "page_number": p_page,
+                "content": p_text,
+                "token_count": len(p_tokens),
+                "parent_ref_id": p_idx,
+                "children": []
+            }
+
+            # Generate sliding child chunks across this parent
+            words = p_text.split()
+            step = max(20, (child_size // 6) - (child_overlap // 6)) # approx word steps
+            window = max(30, child_size // 6)
+
+            for i in range(0, len(words), step):
+                c_words = words[i:i + window]
+                if not c_words:
+                    break
+                c_content = " ".join(c_words)
+                c_tokens = self.tokenize(c_content)
+                if len(c_tokens) >= 5: # avoid tiny noise chunks
+                    parent_obj["children"].append({
+                        "chunk_type": "child",
+                        "page_number": p_page,
+                        "content": c_content,
+                        "token_count": len(c_tokens)
+                    })
+
+            if not parent_obj["children"]:
+                # If short, parent itself serves as child
+                parent_obj["children"].append({
+                    "chunk_type": "child",
+                    "page_number": p_page,
+                    "content": p_text,
+                    "token_count": len(p_tokens)
+                })
+
+            hierarchical_result.append(parent_obj)
+
+        return hierarchical_result
+
     def compute_bm25_scores(self, query_tokens, chunk_token_lists, k1=1.5, b=0.75):
         """
         Computes BM25Okapi scores for all chunks with document length normalization.
@@ -322,6 +402,117 @@ class DocumentRAGEngine:
             "sources": sources,
             "mode": mode,
             "top_page": primary_chunk['page_number']
+        }
+
+    def answer_cross_document(self, query, chunk_records, context_title="Course Curriculum", mode="deep_analysis"):
+        """
+        UniLib v2 Multi-Document Cross-Curriculum Synthesizer:
+        Synthesizes answers across multiple textbooks, syllabi, notes, and papers simultaneously.
+        """
+        if not chunk_records:
+            return {
+                "answer": f"### ⚠️ No Curriculum References Located\n\nNo relevant content found across **{context_title}** for *\"{query}\"*.\n\nTry broader academic terms or check if course materials are linked in the Curriculum tab.",
+                "confidence": 0.0,
+                "sources": [],
+                "mode": mode,
+                "cluster_count": 0
+            }
+
+        # Format chunks for retrieval with document title attribution
+        chunks_for_retrieval = []
+        for cr in chunk_records:
+            chunks_for_retrieval.append({
+                "chunk_index": cr.get('id') or cr.get('chunk_index', 1),
+                "page_number": cr.get('page_number', 1),
+                "slide_number": cr.get('slide_number'),
+                "doc_title": cr.get('doc_title') or cr.get('book_title') or 'Archival Resource',
+                "doc_type": cr.get('doc_type') or 'Textbook',
+                "content": cr.get('content', '')
+            })
+
+        top_chunks = self.retrieve_relevant_chunks(query, chunks_for_retrieval, top_k=6)
+
+        if not top_chunks or top_chunks[0]['similarity_score'] < 0.04:
+            return {
+                "answer": f"### ⚠️ Insufficient Direct Grounding\n\nFound references across **{context_title}**, but none with high confidence regarding *\"{query}\"*.",
+                "confidence": 0.1,
+                "sources": [],
+                "mode": mode,
+                "cluster_count": 0
+            }
+
+        confidence_pct = int(min(top_chunks[0]['similarity_score'] * 100, 99))
+
+        # Group sources by document title for multi-source attribution
+        sources = []
+        unique_docs = set()
+        for c in top_chunks:
+            d_title = c.get("doc_title", "Archival Volume")
+            unique_docs.add(d_title)
+            sources.append({
+                "chunk_index": c["chunk_index"],
+                "doc_title": d_title,
+                "doc_type": c.get("doc_type", "Textbook"),
+                "page": c["page_number"],
+                "slide": c.get("slide_number"),
+                "relevance": f"{int(c['similarity_score'] * 100)}%",
+                "excerpt": (c["content"][:160] + "...") if len(c["content"]) > 160 else c["content"]
+            })
+
+        # Collect unique extracted sentences
+        all_sentences = []
+        for c in top_chunks:
+            sents = [s.strip() for s in re.split(r'(?<=[.?!])\s+', c['content']) if len(s.strip()) > 25]
+            for s in sents:
+                all_sentences.append({
+                    "text": s,
+                    "doc": c.get("doc_title", "Course Reference"),
+                    "page": c["page_number"]
+                })
+
+        # Deduplicate sentences
+        seen = set()
+        deduped = []
+        for s in all_sentences:
+            cleaned = s["text"].lower()
+            if cleaned not in seen:
+                seen.add(cleaned)
+                deduped.append(s)
+
+        if not deduped:
+            deduped = [{"text": top_chunks[0]["content"], "doc": top_chunks[0].get("doc_title", "Course Reference"), "page": top_chunks[0]["page_number"]}]
+
+        doc_summary_pills = ", ".join([f"**{d}**" for d in list(unique_docs)[:3]])
+
+        if mode == "quick_summary":
+            bullets = "\n".join([f"- **Point {i+1}** (*{item['doc']}*, p. {item['page']}): {item['text']}" for i, item in enumerate(deduped[:4])])
+            formatted = (
+                f"### ⚡ Cross-Curriculum Digest: {query.title()}\n\n"
+                f"*Synthesized across {len(unique_docs)} course references ({doc_summary_pills})*\n\n"
+                f"{bullets}\n\n"
+                f"---\n"
+                f"📚 **Multi-Source Evidence**: Grounding Confidence **{confidence_pct}%** across {len(top_chunks)} verified citations."
+            )
+        else:
+            main_thesis = " ".join([d['text'] for d in deduped[:2]])
+            elaborations = "\n".join([f"- **From {d['doc']} (p. {d['page']})**: {d['text']}" for d in deduped[2:5]]) if len(deduped) > 2 else "- Cross-reference confirmed by course syllabus texts."
+            
+            formatted = (
+                f"### 🎓 Course Intelligence Synthesis: {query.title()}\n\n"
+                f"**Unified Academic Assessment**\n"
+                f"{main_thesis}\n\n"
+                f"**Corroborating Evidence & Curriculum Decks**\n"
+                f"{elaborations}\n\n"
+                f"---\n"
+                f"📌 **Cross-Document Grounding**: Synthesized from {len(unique_docs)} distinct references with **{confidence_pct}%** confidence."
+            )
+
+        return {
+            "answer": formatted,
+            "confidence": top_chunks[0]['similarity_score'],
+            "sources": sources,
+            "mode": mode,
+            "cluster_count": len(unique_docs)
         }
 
     def generate_flashcards(self, chunks, book_title="this document"):
