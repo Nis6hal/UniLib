@@ -70,33 +70,25 @@ export default function LandingPage({ onOpenAuth }) {
       prompt: 'Synthesize the core distinction between 3NF and BCNF with functional dependencies.',
       response: 'Boyce-Codd Normal Form (BCNF) strictly requires that for every non-trivial functional dependency X -> Y, X must be a superkey.\n\nUnlike 3NF (which permits dependency X -> A if A is a prime attribute belonging to candidate keys), BCNF disallows this. BCNF eliminates anomalies when multiple overlapping composite candidate keys exist.',
       source: 'Silberschatz • Database System Concepts (6th Edition)',
-      page: 42,
-      confidence: '99.4%',
-      latency: '18ms'
+      page: 42
     },
     'Quick Digest': {
       prompt: 'Provide an executive 4-bullet digest of Relational Normalization stages.',
       response: '1. 1NF: Atomic attributes; eliminates repeating groups and composite fields.\n2. 2NF: 1NF + eliminates partial key functional dependencies.\n3. 3NF: 2NF + eliminates transitive dependencies (X -> Y -> Z).\n4. BCNF: Every determinant is strictly a candidate superkey.',
       source: 'Dept. of Computer Science • CMP-310 Lecture Decks',
-      page: 18,
-      confidence: '98.2%',
-      latency: '12ms'
+      page: 18
     },
     'Exam Flashcard': {
       prompt: 'Generate an active-recall evaluation flashcard for Semester V Database Exam.',
       response: 'PROMPT: Given relation R(A, B, C) with dependencies A -> B and B -> C, identify the highest normal form of R.\n\nANSWER: 2NF. Dependency B -> C represents a transitive dependency on candidate key A, violating 3NF condition.',
       source: 'University Exam Vault • 2024 Past Papers Collection',
-      page: 89,
-      confidence: '99.1%',
-      latency: '15ms'
+      page: 89
     },
     'Practice Quiz': {
       prompt: 'Construct a Bloom\'s Taxonomy conceptual multiple-choice question.',
       response: 'QUESTION: In write-ahead logging (WAL), why must the log record reach persistent storage before the corresponding dirty page is flushed to disk?\n\n[A] To minimize memory buffer overhead\n[B] To satisfy the Write-Ahead Logging Invariant for Atomicity and Durability (Correct)\n[C] To prevent lock deadlock contention',
       source: 'Operating Systems & DB Engine Architecture • Chap. 14',
-      page: 312,
-      confidence: '99.8%',
-      latency: '22ms'
+      page: 312
     }
   };
 
@@ -394,8 +386,8 @@ export default function LandingPage({ onOpenAuth }) {
                 <div className="hud-console-footer">
                   <div className="hud-tags-group">
                     <span className="hud-tag">PDF In-Browser</span>
-                    <span className="hud-tag">Hybrid RAG</span>
-                    <span className="hud-tag">18ms Latency</span>
+                    <span className="hud-tag">Cross-Document RAG</span>
+                    <span className="hud-tag">Exact Page Grounding</span>
                   </div>
                   <button
                     className="btn"
@@ -603,15 +595,12 @@ export default function LandingPage({ onOpenAuth }) {
                 </div>
 
                 <div className="rag-confidence-widget">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: 6 }}>
-                    <span>Grounding Confidence</span>
-                    <strong style={{ color: 'var(--success)' }}>{ragScenarios[activeRagMode]?.confidence}</strong>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.74rem', color: 'var(--text-secondary)', marginBottom: 4 }}>
+                    <ShieldCheck size={14} color="var(--success)" />
+                    <strong>Verified Passage Grounding</strong>
                   </div>
-                  <div className="confidence-track">
-                    <div className="confidence-fill" style={{ width: ragScenarios[activeRagMode]?.confidence }} />
-                  </div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 6 }}>
-                    Latency: {ragScenarios[activeRagMode]?.latency} • Verified Citation
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    Extracted from official university textbooks and lecture syllabus decks.
                   </div>
                 </div>
               </div>

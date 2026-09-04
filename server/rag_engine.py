@@ -353,52 +353,32 @@ class DocumentRAGEngine:
                 seen.add(s_clean)
                 unique_sentences.append(s)
 
-        if not unique_sentences:
-            unique_sentences = [primary_chunk['content']]
+        # Clean, natural synthesis without artificial Frankenstein templates
+        primary_text = primary_chunk['content'].strip()
+        secondary_text = top_chunks[1]['content'].strip() if len(top_chunks) > 1 else ""
 
-        # Synthesis based on requested mode
         if mode == "quick_summary":
-            bullets = "\n".join([f"- **Point {i+1}**: {s}" for i, s in enumerate(unique_sentences[:4])])
+            sents = [s.strip() for s in re.split(r'(?<=[.?!])\s+', primary_text + " " + secondary_text) if len(s.strip()) > 30]
+            bullets = "\n".join([f"- {s}" for s in sents[:4]]) if sents else f"- {primary_text}"
             formatted_answer = (
-                f"### ⚡ High-Yield Summary: {query.title()}\n\n"
-                f"*Sourced from **{book_title}** (Page {primary_chunk['page_number']})*\n\n"
+                f"**Key Findings for \"{query}\":**\n\n"
                 f"{bullets}\n\n"
-                f"---\n"
-                f"📌 **Citation**: Document Page {primary_chunk['page_number']} • Grounding Confidence: **{confidence_pct}%**"
+                f"*Source: {book_title} (Page {primary_chunk['page_number']})*"
             )
-        elif mode == "concept_comparison":
-            half = len(unique_sentences) // 2 or 1
-            aspect1 = unique_sentences[:half]
-            aspect2 = unique_sentences[half:half*2] or unique_sentences[half:]
-            formatted_answer = (
-                f"### ⚖️ Concept Analysis: {query.title()}\n\n"
-                f"#### Core Formulation & Premises (Page {primary_chunk['page_number']})\n"
-                f"{' '.join(aspect1[:2])}\n\n"
-                f"#### Operational Characteristics & Trade-offs\n"
-                f"{' '.join(aspect2[:2]) if aspect2 else primary_chunk['content']}\n\n"
-                f"---\n"
-                f"📌 **Academic Citation**: *{book_title}*, Page {primary_chunk['page_number']} (Grounding: {confidence_pct}%)"
-            )
-        else: # deep_analysis (default)
-            exec_summary = " ".join(unique_sentences[:2])
-            technical_elaboration = " ".join(unique_sentences[2:5]) if len(unique_sentences) > 2 else "This volume discusses the theoretical foundations and implementation constraints in depth on the cited page."
-            takeaways = "\n".join([f"- {s}" for s in unique_sentences[:3]])
+        else:
+            # Direct, readable prose without '### 🔬 Deep Academic Analysis' or fake headers
+            text_block = primary_text
+            if secondary_text and secondary_text != primary_text:
+                text_block += "\n\n" + secondary_text
 
             formatted_answer = (
-                f"### 🔬 Deep Academic Analysis: {query.title()}\n\n"
-                f"**Executive Synthesis**\n"
-                f"{exec_summary}\n\n"
-                f"**Technical Details & Implementation Foundations**\n"
-                f"{technical_elaboration}\n\n"
-                f"**Key Academic Takeaways**\n"
-                f"{takeaways}\n\n"
+                f"{text_block}\n\n"
                 f"---\n"
-                f"📌 **Verified Citation**: *{book_title}* (Page {primary_chunk['page_number']}) • Grounding Confidence: **{confidence_pct}%**"
+                f"**Referenced Source**: *{book_title}* (Page {primary_chunk['page_number']})"
             )
 
         return {
             "answer": formatted_answer,
-            "confidence": primary_chunk['similarity_score'],
             "sources": sources,
             "mode": mode,
             "top_page": primary_chunk['page_number']
@@ -482,34 +462,23 @@ class DocumentRAGEngine:
         if not deduped:
             deduped = [{"text": top_chunks[0]["content"], "doc": top_chunks[0].get("doc_title", "Course Reference"), "page": top_chunks[0]["page_number"]}]
 
-        doc_summary_pills = ", ".join([f"**{d}**" for d in list(unique_docs)[:3]])
+        primary_excerpt = top_chunks[0]["content"].strip()
+        secondary_excerpt = top_chunks[1]["content"].strip() if len(top_chunks) > 1 else ""
 
         if mode == "quick_summary":
-            bullets = "\n".join([f"- **Point {i+1}** (*{item['doc']}*, p. {item['page']}): {item['text']}" for i, item in enumerate(deduped[:4])])
+            bullets = "\n".join([f"- {d['text']} (*{d['doc']}*, p. {d['page']})" for d in deduped[:4]])
             formatted = (
-                f"### ⚡ Cross-Curriculum Digest: {query.title()}\n\n"
-                f"*Synthesized across {len(unique_docs)} course references ({doc_summary_pills})*\n\n"
-                f"{bullets}\n\n"
-                f"---\n"
-                f"📚 **Multi-Source Evidence**: Grounding Confidence **{confidence_pct}%** across {len(top_chunks)} verified citations."
+                f"**Summary of Course Materials for \"{query}\":**\n\n"
+                f"{bullets}"
             )
         else:
-            main_thesis = " ".join([d['text'] for d in deduped[:2]])
-            elaborations = "\n".join([f"- **From {d['doc']} (p. {d['page']})**: {d['text']}" for d in deduped[2:5]]) if len(deduped) > 2 else "- Cross-reference confirmed by course syllabus texts."
-            
-            formatted = (
-                f"### 🎓 Course Intelligence Synthesis: {query.title()}\n\n"
-                f"**Unified Academic Assessment**\n"
-                f"{main_thesis}\n\n"
-                f"**Corroborating Evidence & Curriculum Decks**\n"
-                f"{elaborations}\n\n"
-                f"---\n"
-                f"📌 **Cross-Document Grounding**: Synthesized from {len(unique_docs)} distinct references with **{confidence_pct}%** confidence."
-            )
+            body = primary_excerpt
+            if secondary_excerpt and secondary_excerpt != primary_excerpt:
+                body += f"\n\n**Related Context ({top_chunks[1].get('doc_title', 'Reference')}, p. {top_chunks[1]['page_number']})**:\n{secondary_excerpt}"
+            formatted = body
 
         return {
             "answer": formatted,
-            "confidence": top_chunks[0]['similarity_score'],
             "sources": sources,
             "mode": mode,
             "cluster_count": len(unique_docs)
