@@ -3791,6 +3791,240 @@ p.success {
 }
 
 /* ==========================================================================
+   Vanguard 2.0 Dynamic Extensions: Scroll Progress, Book Canvas & Research
+   ========================================================================== */
+
+/* 1. Viewport Top Scroll Progress Tracker */
+.vanguard-scroll-progress-track {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  z-index: 200;
+  pointer-events: none;
+}
+
+.vanguard-scroll-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #d4af37 0%, #38bdf8 50%, #10b981 100%);
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.6);
+  transition: width 0.1s ease-out;
+}
+
+/* 2. Scroll-Triggered Reveal Observer Animations */
+.vanguard-reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.vanguard-reveal-on-scroll.vanguard-revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 3. Hero Orbital Particle Canvas & Unfolding Book Dynamics */
+.hero-orbital-canvas {
+  position: absolute;
+  top: -40px;
+  left: -40px;
+  right: -40px;
+  bottom: -40px;
+  width: calc(100% + 80px);
+  height: calc(100% + 80px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.85;
+}
+
+.hero-orbit-pill {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(10, 14, 22, 0.88);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.orbit-pill-1 {
+  top: -12px;
+  left: 24px;
+  animation: floatOrbital1 4s ease-in-out infinite alternate;
+}
+
+.orbit-pill-2 {
+  bottom: -14px;
+  right: 28px;
+  animation: floatOrbital2 4.6s ease-in-out infinite alternate;
+}
+
+@keyframes floatOrbital1 {
+  0% { transform: translateY(0px) rotate(-1deg); }
+  100% { transform: translateY(-8px) rotate(2deg); }
+}
+
+@keyframes floatOrbital2 {
+  0% { transform: translateY(0px) rotate(1deg); }
+  100% { transform: translateY(6px) rotate(-2deg); }
+}
+
+/* Animated Book Cover & Pages */
+.animated-book-cover {
+  position: relative;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.showcase-3d-card:hover .animated-book-cover {
+  transform: rotateY(-18deg) scale(1.05);
+}
+
+.book-leaf-edge {
+  position: absolute;
+  right: -3px;
+  top: 4px;
+  bottom: 4px;
+  width: 5px;
+  background: repeating-linear-gradient(
+    to bottom,
+    #fff,
+    #fff 1px,
+    #ddd 1px,
+    #ddd 2px
+  );
+  border-radius: 0 2px 2px 0;
+  box-shadow: 1px 0 3px rgba(0,0,0,0.5);
+  opacity: 0.8;
+}
+
+/* 4. Live Research Repository Stream Grid & Cards */
+.research-stream-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  padding: 20px;
+}
+
+@media (max-width: 820px) {
+  .research-stream-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.research-stream-card {
+  background: rgba(14, 19, 29, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.research-stream-card:hover {
+  background: rgba(22, 30, 46, 0.85);
+  border-color: rgba(56, 189, 248, 0.4);
+  transform: translateY(-4px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5), 0 0 20px rgba(56, 189, 248, 0.12);
+}
+
+.research-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 8px;
+}
+
+.research-pill-dept {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.research-pill-doi {
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.research-card-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.35;
+  margin-bottom: 6px;
+}
+
+.research-card-authors {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.research-card-abstract {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 16px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.research-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.research-citation-count {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.research-read-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--info);
+  transition: transform 0.2s ease;
+}
+
+.research-stream-card:hover .research-read-link {
+  transform: translateX(3px);
+  color: #fff;
+}
+
+/* ==========================================================================
    Comprehensive Mobile & Tablet Responsiveness System (Zero Overflows)
    ========================================================================== */
 

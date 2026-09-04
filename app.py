@@ -155,7 +155,8 @@ def init_db():
         borrowed_at TEXT NOT NULL DEFAULT (datetime('now')),
         due_at TEXT NOT NULL,
         returned_at TEXT,
-        renewals INTEGER NOT NULL DEFAULT 0
+        renewals INTEGER NOT NULL DEFAULT 0,
+        renewal_status TEXT NOT NULL DEFAULT 'none'
     );
 
     -- reservations: full lifecycle tracked here
@@ -204,10 +205,12 @@ def init_db():
 
     # non-destructive migrations for existing DBs
 
-    # borrows: add renewals column if missing
+    # borrows: add renewals & renewal_status columns if missing
     existing_borrows = [r[1] for r in db.execute("PRAGMA table_info(borrows)").fetchall()]
     if 'renewals' not in existing_borrows:
         db.execute("ALTER TABLE borrows ADD COLUMN renewals INTEGER NOT NULL DEFAULT 0")
+    if 'renewal_status' not in existing_borrows:
+        db.execute("ALTER TABLE borrows ADD COLUMN renewal_status TEXT NOT NULL DEFAULT 'none'")
 
     # reservations: check if the old CHECK constraint is present (missing 'ready')
     # If so, recreate the table with the correct constraint via SQLite's recommended
@@ -705,9 +708,10 @@ def delete_book(bid):
 
 @app.route('/api/borrows', methods=['GET'])
 def get_borrows():
-    active_only  = request.args.get('active')
-    overdue_only = request.args.get('overdue')
-    user_id      = request.args.get('user_id')
+    active_only    = request.args.get('active')
+    overdue_only   = request.args.get('overdue')
+    user_id        = request.args.get('user_id')
+    renewal_status = request.args.get('renewal_status')
     sql = """SELECT br.*, u.name AS user_name, u.email,
                     b.title, b.author, b.cover_color, b.id AS book_id
              FROM borrows br
@@ -718,6 +722,7 @@ def get_borrows():
     if active_only:  where.append("br.returned_at IS NULL")
     if overdue_only: where.append("br.due_at < datetime('now') AND br.returned_at IS NULL")
     if user_id:      where.append("br.user_id = ?"); params.append(user_id)
+    if renewal_status: where.append("br.renewal_status = ?"); params.append(renewal_status)
     if where: sql += " WHERE " + " AND ".join(where)
     sql += " ORDER BY br.borrowed_at DESC"
     return jsonify(rows_to_list(q(sql, params)))
@@ -769,6 +774,16 @@ def borrow_book():
 
 @app.route('/api/borrows/<int:bid>/return', methods=['POST'])
 def return_book(bid):
+    # Security check: verify requester role
+    req_data = request.json or {}
+    operator_role = req_data.get('role') or request.headers.get('X-User-Role')
+    operator_id = req_data.get('operator_id') or req_data.get('user_id')
+
+    if operator_role == 'student':
+        return jsonify({
+            "error": "Access Denied: Only librarians or library administrators can verify and accept physical book returns."
+        }), 403
+
     borrow = q("SELECT * FROM borrows WHERE id=?", (bid,), one=True)
     if not borrow: return jsonify({"error": "Not found"}), 404
     if borrow['returned_at']: return jsonify({"error": "Already returned"}), 400
@@ -776,7 +791,7 @@ def return_book(bid):
     now = datetime.now().isoformat()
     db  = get_db()
     db.execute("BEGIN")
-    db.execute("UPDATE borrows SET returned_at=? WHERE id=?", (now, bid))
+    db.execute("UPDATE borrows SET returned_at=?, renewal_status='none' WHERE id=?", (now, bid))
 
     # Fine calculation
     due = datetime.fromisoformat(borrow['due_at'])
@@ -786,9 +801,10 @@ def return_book(bid):
         fine_amount = round(days_late * FINE_PER_DAY, 2)
         db.execute("INSERT INTO fines(borrow_id,amount) VALUES(?,?)", (bid, fine_amount))
 
+    operator_note = f"by operator #{operator_id} ({operator_role})" if operator_id else "at circulation desk"
     db.execute("""INSERT INTO audit_log(table_name,record_id,action,details)
                   VALUES('borrows',?,?,?)""",
-               (bid,'UPDATE',f'returned copy {borrow["copy_id"]}, fine=${fine_amount}'))
+               (bid,'UPDATE',f'returned copy {borrow["copy_id"]} {operator_note}, fine=${fine_amount}'))
 
     # Reservation queue: give returned copy to next person in line
     copy_book = q("SELECT book_id FROM book_copies WHERE id=?", (borrow['copy_id'],), one=True)
@@ -839,16 +855,82 @@ def renew_borrow(bid):
                        WHERE book_id=? AND status IN ('pending','ready')""",
                     (copy_book['book_id'],), one=True)[0]
         if pending > 0:
-            return jsonify({"error": "Cannot renew — this book has pending reservations."}), 400
+            return jsonify({"error": "Cannot renew — this book has pending reservations from other students."}), 400
+
+    req_data = request.json or {}
+    requester_role = req_data.get('role') or request.headers.get('X-User-Role')
+    
+    # If student requests renewal, set to pending_approval for librarian/admin verification
+    if requester_role == 'student':
+        if 'renewal_status' in borrow.keys() and borrow['renewal_status'] == 'pending_approval':
+            return jsonify({"error": "A renewal request is already pending librarian verification."}), 400
+        run("UPDATE borrows SET renewal_status='pending_approval' WHERE id=?", (bid,))
+        run("""INSERT INTO audit_log(table_name,record_id,action,details) VALUES('borrows',?,?,?)""",
+            (bid,'UPDATE',f'student user {borrow["user_id"]} requested loan renewal (awaiting verification)'))
+        return jsonify({
+            "ok": True,
+            "status": "pending_approval",
+            "message": "Renewal request submitted for librarian verification. Once approved at the circulation desk, your loan will be extended by 14 days."
+        })
+
+    # Direct renewal by staff / librarian / admin
+    current_due  = datetime.fromisoformat(borrow['due_at'])
+    new_due      = (current_due + timedelta(days=RENEWAL_DAYS)).isoformat()
+    new_renewals = borrow['renewals'] + 1
+    run("UPDATE borrows SET due_at=?, renewals=?, renewal_status='approved' WHERE id=?", (new_due, new_renewals, bid))
+    run("""INSERT INTO audit_log(table_name,record_id,action,details) VALUES('borrows',?,?,?)""",
+        (bid,'UPDATE',f'renewed (#{new_renewals}/{MAX_RENEWALS}) by staff, new due: {new_due[:10]}'))
+    return jsonify({
+        "ok": True,
+        "new_due_at": new_due,
+        "renewals": new_renewals,
+        "renewals_left": MAX_RENEWALS - new_renewals,
+        "status": "approved"
+    })
+
+@app.route('/api/borrows/<int:bid>/approve-renewal', methods=['POST'])
+def approve_renewal(bid):
+    borrow = q("SELECT * FROM borrows WHERE id=?", (bid,), one=True)
+    if not borrow: return jsonify({"error": "Borrow record not found"}), 404
+    if borrow['returned_at']: return jsonify({"error": "Book already returned"}), 400
+    if borrow['renewals'] >= MAX_RENEWALS:
+        run("UPDATE borrows SET renewal_status='none' WHERE id=?", (bid,))
+        return jsonify({"error": f"Maximum renewals limit ({MAX_RENEWALS}) already reached."}), 400
+
+    copy_book = q("SELECT book_id FROM book_copies WHERE id=?", (borrow['copy_id'],), one=True)
+    if copy_book:
+        pending = q("""SELECT COUNT(*) FROM reservations
+                       WHERE book_id=? AND status IN ('pending','ready')""",
+                    (copy_book['book_id'],), one=True)[0]
+        if pending > 0:
+            return jsonify({"error": "Cannot approve renewal: this book has active holds in the queue."}), 400
 
     current_due  = datetime.fromisoformat(borrow['due_at'])
     new_due      = (current_due + timedelta(days=RENEWAL_DAYS)).isoformat()
     new_renewals = borrow['renewals'] + 1
-    run("UPDATE borrows SET due_at=?, renewals=? WHERE id=?", (new_due, new_renewals, bid))
+    run("UPDATE borrows SET due_at=?, renewals=?, renewal_status='approved' WHERE id=?", (new_due, new_renewals, bid))
     run("""INSERT INTO audit_log(table_name,record_id,action,details) VALUES('borrows',?,?,?)""",
-        (bid,'UPDATE',f'renewed (#{new_renewals}/{MAX_RENEWALS}), new due: {new_due[:10]}'))
-    return jsonify({"ok": True, "new_due_at": new_due,
-                    "renewals": new_renewals, "renewals_left": MAX_RENEWALS - new_renewals})
+        (bid,'UPDATE',f'renewal verified & approved by librarian (#{new_renewals}/{MAX_RENEWALS}), new due: {new_due[:10]}'))
+    return jsonify({
+        "ok": True,
+        "new_due_at": new_due,
+        "renewals": new_renewals,
+        "renewals_left": MAX_RENEWALS - new_renewals,
+        "status": "approved"
+    })
+
+@app.route('/api/borrows/<int:bid>/reject-renewal', methods=['POST'])
+def reject_renewal(bid):
+    borrow = q("SELECT * FROM borrows WHERE id=?", (bid,), one=True)
+    if not borrow: return jsonify({"error": "Borrow record not found"}), 404
+    
+    req_data = request.json or {}
+    reason = req_data.get('reason', 'Rejected by circulation librarian')
+    
+    run("UPDATE borrows SET renewal_status='rejected' WHERE id=?", (bid,))
+    run("""INSERT INTO audit_log(table_name,record_id,action,details) VALUES('borrows',?,?,?)""",
+        (bid,'UPDATE',f'renewal request rejected: {reason}'))
+    return jsonify({"ok": True, "status": "rejected", "message": "Renewal request rejected."})
 
 # ── Reservations ──────────────────────────────────────────────────────────────
 

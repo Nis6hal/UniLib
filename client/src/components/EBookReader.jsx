@@ -83,6 +83,7 @@ export default function EBookReader({ currentUser, initialBook }) {
   // Batch Folder Upload
   const [batchFiles, setBatchFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [autoImportEnabled, setAutoImportEnabled] = useState(false);
   const folderInputRef = useRef(null);
 
   // Active Reader state
@@ -348,7 +349,31 @@ export default function EBookReader({ currentUser, initialBook }) {
 
   const ACCEPTED_EXT = ['pdf', 'docx', 'epub', 'txt', 'md'];
 
-  const collectFiles = (fileList) => {
+  const uploadFilesDirectly = async (filesToUpload) => {
+    if (!filesToUpload || filesToUpload.length === 0) return;
+    setIsUploading(true);
+    const formData = new FormData();
+    filesToUpload.forEach((item) => {
+      formData.append('files', item.file);
+    });
+    if (currentUser?.id) {
+      formData.append('user_id', currentUser.id);
+    }
+
+    try {
+      const res = await api.uploadBatchEBooks(formData);
+      setShowUploadModal(false);
+      setBatchFiles([]);
+      addToast(`Successfully uploaded & indexed ${res.count || filesToUpload.length} digital books to the cloud shelf!`, 'success');
+      load();
+    } catch (err) {
+      addToast(err.message, 'error');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const collectFiles = (fileList, autoUpload = false) => {
     const raw = Array.from(fileList || []);
     const parsed = raw
       .filter((f) => ACCEPTED_EXT.includes((f.name.split('.').pop() || '').toLowerCase()))
@@ -357,16 +382,21 @@ export default function EBookReader({ currentUser, initialBook }) {
       addToast('No supported documents found (.pdf, .docx, .epub, .txt, .md)', 'error');
       return;
     }
-    setBatchFiles((prev) => [...prev, ...parsed]);
-    addToast(`Added ${parsed.length} document(s) to the import queue`, 'info');
+
+    if (autoUpload) {
+      uploadFilesDirectly(parsed);
+    } else {
+      setBatchFiles((prev) => [...prev, ...parsed]);
+      addToast(`Found ${parsed.length} document(s). Click 'Upload & Index Now' below to complete upload.`, 'info');
+    }
   };
 
   const handleFolderChange = (e) => {
-    collectFiles(e.target.files);
+    collectFiles(e.target.files, autoImportEnabled);
   };
 
   const handleMultiFileChange = (e) => {
-    collectFiles(e.target.files);
+    collectFiles(e.target.files, autoImportEnabled);
   };
 
   const removeBatchFile = (index) => {
@@ -407,30 +437,10 @@ export default function EBookReader({ currentUser, initialBook }) {
   const handleUploadBatch = async (e) => {
     e.preventDefault();
     if (batchFiles.length === 0) {
-      addToast('Please select a folder containing documents', 'error');
+      addToast('Please select documents to upload', 'error');
       return;
     }
-
-    setIsUploading(true);
-    const formData = new FormData();
-    batchFiles.forEach((item) => {
-      formData.append('files', item.file);
-    });
-    if (currentUser?.id) {
-      formData.append('user_id', currentUser.id);
-    }
-
-    try {
-      const res = await api.uploadBatchEBooks(formData);
-      setShowUploadModal(false);
-      setBatchFiles([]);
-      addToast(`Successfully imported ${res.count || batchFiles.length} books from folder!`, 'success');
-      load();
-    } catch (err) {
-      addToast(err.message, 'error');
-    } finally {
-      setIsUploading(false);
-    }
+    await uploadFilesDirectly(batchFiles);
   };
 
   const handleDeleteEBook = async (id, title) => {
@@ -882,23 +892,35 @@ export default function EBookReader({ currentUser, initialBook }) {
                       onChange={handleMultiFileChange}
                     />
                   )}
-                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 6 }}>
-                    {uploadMode === 'folder'
-                      ? 'Automatically detects and indexes all .pdf, .epub, .docx, and .txt files inside the selected directory.'
-                      : 'Hold Ctrl / Cmd to pick several files at once. Titles and authors are auto-extracted from file names (e.g. "Author - Title.pdf").'}
-                  </p>
+                  <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="checkbox"
+                      id="autoImportToggle"
+                      checked={autoImportEnabled}
+                      onChange={(e) => setAutoImportEnabled(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <label htmlFor="autoImportToggle" style={{ fontSize: '0.78rem', color: 'var(--text-main)', cursor: 'pointer', margin: 0 }}>
+                      ⚡ <strong>Auto-upload immediately</strong> upon file/folder selection (bypasses preview queue)
+                    </label>
+                  </div>
                 </div>
 
                 {batchFiles.length > 0 && (
                   <div style={{ maxHeight: 240, overflowY: 'auto', background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 12, marginBottom: 18 }}>
                     <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--primary)', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <CheckCircle2 size={14} /> Ready to Import ({batchFiles.length} files)
+                        <CheckCircle2 size={14} /> Ready to Upload ({batchFiles.length} files staged)
                       </span>
                       <button type="button" className="ghost" style={{ fontSize: '0.72rem', color: 'var(--danger)' }} onClick={() => setBatchFiles([])}>
                         Clear all
                       </button>
                     </div>
+
+                    <div style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: 6, padding: '8px 12px', fontSize: '0.75rem', color: 'var(--text-main)', marginBottom: 10 }}>
+                      ℹ️ <strong>Files staged:</strong> Review the documents below. Click the green <strong>"Upload & Index {batchFiles.length} Books"</strong> button below to save them to the digital shelf.
+                    </div>
+
                     {batchFiles.map((f, i) => (
                       <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                         <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '62%' }}>
@@ -921,9 +943,19 @@ export default function EBookReader({ currentUser, initialBook }) {
                   <button type="button" className="secondary" onClick={() => setShowUploadModal(false)}>
                     Cancel
                   </button>
-                  <button type="submit" disabled={isUploading || batchFiles.length === 0}>
+                  <button
+                    type="submit"
+                    className="btn"
+                    style={{
+                      background: batchFiles.length > 0 ? '#10b981' : undefined,
+                      color: batchFiles.length > 0 ? '#fff' : undefined
+                    }}
+                    disabled={isUploading || batchFiles.length === 0}
+                  >
                     <FolderUp size={15} />
-                    {isUploading ? 'Importing...' : `Import ${batchFiles.length} Book${batchFiles.length === 1 ? '' : 's'}`}
+                    {isUploading
+                      ? 'Uploading & Indexing into Shelf...'
+                      : `Upload & Index ${batchFiles.length} Book${batchFiles.length === 1 ? '' : 's'} Now`}
                   </button>
                 </div>
               </form>

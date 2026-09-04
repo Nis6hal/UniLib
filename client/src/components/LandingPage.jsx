@@ -110,17 +110,159 @@ export default function LandingPage({ onOpenAuth }) {
     { id: 'Security', label: 'Network Security', sub: '5 Volumes • Crypto/TLS', x: 68, y: 80, color: '#ec4899' }
   ];
 
-  // Fetch Public Stats on load
+  // Live Research Papers & Theses State
+  const [liveResearchPapers, setLiveResearchPapers] = useState([]);
+  const [activeResearchFilter, setActiveResearchFilter] = useState('All');
+  const [loadingResearch, setLoadingResearch] = useState(false);
+  const [readingProgress, setReadingProgress] = useState(0);
+
+  // Canvas ref for animated particle orbit & digital book spine
+  const canvasRef = useRef(null);
+
+  // 1. Reading / Page Scroll Progress
   useEffect(() => {
-    async function fetchStats() {
+    const handleScroll = () => {
+      const totalScroll = document.documentElement.scrollTop;
+      const windowHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+      if (windowHeight > 0) {
+        const scrollPercent = (totalScroll / windowHeight) * 100;
+        setReadingProgress(Math.min(100, Math.max(0, scrollPercent)));
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // 2. Intersection Observer for Scroll-Triggered Reveal Transitions
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('vanguard-revealed');
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
+    );
+
+    const revealElements = document.querySelectorAll('.vanguard-reveal-on-scroll');
+    revealElements.forEach((el) => observer.observe(el));
+
+    return () => observer.disconnect();
+  }, [liveResearchPapers]);
+
+  // 3. Dynamic Interactive Canvas Simulation (Particle Web & Orbiting Constellations)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animationFrameId;
+    let width = (canvas.width = canvas.offsetWidth || 340);
+    let height = (canvas.height = canvas.offsetHeight || 280);
+
+    const handleResize = () => {
+      if (!canvas) return;
+      width = canvas.width = canvas.offsetWidth || 340;
+      height = canvas.height = canvas.offsetHeight || 280;
+    };
+    window.addEventListener('resize', handleResize);
+
+    const particles = Array.from({ length: 32 }, () => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      vx: (Math.random() - 0.5) * 0.7,
+      vy: (Math.random() - 0.5) * 0.7,
+      radius: Math.random() * 2 + 1,
+      color: Math.random() > 0.4 ? 'rgba(212, 175, 55, ' : 'rgba(56, 189, 248, '
+    }));
+
+    let angle = 0;
+
+    const render = () => {
+      ctx.clearRect(0, 0, width, height);
+      angle += 0.015;
+
+      // Draw subtle orbital rings
+      const cx = width / 2;
+      const cy = height / 2;
+
+      ctx.save();
+      ctx.strokeStyle = 'rgba(212, 175, 55, 0.15)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 110, 50, angle * 0.5, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.12)';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 80, 36, -angle * 0.7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      // Draw floating particles with dynamic web linking
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if (p.x < 0 || p.x > width) p.vx *= -1;
+        if (p.y < 0 || p.y > height) p.vy *= -1;
+
+        ctx.fillStyle = p.color + '0.6)';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        for (let j = i + 1; j < particles.length; j++) {
+          const p2 = particles[j];
+          const dist = Math.hypot(p.x - p2.x, p.y - p2.y);
+          if (dist < 65) {
+            ctx.strokeStyle = `rgba(212, 175, 55, ${(1 - dist / 65) * 0.18})`;
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      animationFrameId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  // Fetch Public Stats and Live Research on load
+  useEffect(() => {
+    async function fetchData() {
       try {
         const data = await api.getPublicStats();
         if (data) setLiveStats(data);
       } catch (err) {
         console.error('Failed to load public stats:', err);
       }
+
+      try {
+        setLoadingResearch(true);
+        const papers = await api.getResearchPapers();
+        if (Array.isArray(papers)) {
+          setLiveResearchPapers(papers);
+        }
+      } catch (err) {
+        console.warn('Could not load live research papers:', err);
+      } finally {
+        setLoadingResearch(false);
+      }
     }
-    fetchStats();
+    fetchData();
   }, []);
 
   // Handle live search
@@ -195,6 +337,14 @@ export default function LandingPage({ onOpenAuth }) {
         <div className="ambient-orb orb-indigo" />
       </div>
 
+      {/* Scroll Progress Bar at Viewport Top */}
+      <div className="vanguard-scroll-progress-track">
+        <div
+          className="vanguard-scroll-progress-fill"
+          style={{ width: `${readingProgress}%` }}
+        />
+      </div>
+
       {/* Floating Island Navigation Bar */}
       <nav className="vanguard-floating-nav">
         <div className="nav-brand-pill">
@@ -209,6 +359,7 @@ export default function LandingPage({ onOpenAuth }) {
           <a href="#discovery" className="nav-link-item">Catalog Discovery</a>
           <a href="#rag-engine" className="nav-link-item">Hybrid RAG</a>
           <a href="#curriculum" className="nav-link-item">Curriculum Hub</a>
+          <a href="#research-stream" className="nav-link-item">Research Archive</a>
           <a href="#graph" className="nav-link-item">Knowledge Matrix</a>
         </div>
 
@@ -303,8 +454,10 @@ export default function LandingPage({ onOpenAuth }) {
             </div>
           </div>
 
-          {/* Right Column: 3D Interactive Spotlight Tilt Card */}
-          <div className="hero-3d-stage">
+          {/* Right Column: 3D Interactive Spotlight Tilt Card & Orbital Particle Canvas */}
+          <div className="hero-3d-stage vanguard-reveal-on-scroll">
+            <canvas ref={canvasRef} className="hero-orbital-canvas" />
+
             <div
               className="showcase-3d-card spotlight-card"
               style={tiltStyle}
@@ -315,8 +468,20 @@ export default function LandingPage({ onOpenAuth }) {
                 <ShieldCheck size={12} color="var(--success)" /> Verified Archival Grounding
               </div>
 
+              {/* Floating Orbiting Micro-Badge */}
+              <div className="hero-orbit-pill orbit-pill-1">
+                <Sparkles size={11} color="var(--primary)" />
+                <span>RAG Grounded</span>
+              </div>
+
+              <div className="hero-orbit-pill orbit-pill-2">
+                <FileText size={11} color="#38bdf8" />
+                <span>DOI Indexed</span>
+              </div>
+
               <div className="showcase-book-spine">
-                <div className="showcase-cover-art">
+                <div className="showcase-cover-art animated-book-cover">
+                  <div className="book-leaf-edge" />
                   <span style={{ fontSize: '0.62rem', color: 'var(--primary)', fontWeight: 700, textTransform: 'uppercase' }}>Core Volume</span>
                   <BookMarked size={24} color="#d4af37" />
                   <span style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.6)' }}>CMP-310</span>
@@ -390,7 +555,7 @@ export default function LandingPage({ onOpenAuth }) {
       </section>
 
       {/* 2. Interactive Unified Academic Discovery Simulator (With Real DB Live Search) */}
-      <section id="discovery" className="vanguard-section">
+      <section id="discovery" className="vanguard-section vanguard-reveal-on-scroll">
         <div className="section-head-centered">
           <div className="section-eyebrow">Instant Cross-Catalog Index</div>
           <h2 className="section-title-large">Unified Academic Discovery</h2>
@@ -514,7 +679,7 @@ export default function LandingPage({ onOpenAuth }) {
       </section>
 
       {/* 3. Hybrid Academic RAG Intelligence Terminal (Split-Console Architecture) */}
-      <section id="rag-engine" className="vanguard-section" style={{ background: 'rgba(12, 15, 22, 0.7)' }}>
+      <section id="rag-engine" className="vanguard-section vanguard-reveal-on-scroll" style={{ background: 'rgba(12, 15, 22, 0.7)' }}>
         <div className="max-w-5xl mx-auto" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 32 }}>
           <div>
             <div className="section-eyebrow">Production-Grade Intelligence</div>
@@ -598,7 +763,7 @@ export default function LandingPage({ onOpenAuth }) {
       </section>
 
       {/* 4. Structured Syllabi (Asymmetric Engineering Bento Grid) */}
-      <section id="curriculum" className="vanguard-section">
+      <section id="curriculum" className="vanguard-section vanguard-reveal-on-scroll">
         <div className="section-head-centered">
           <div className="section-eyebrow">Structured Syllabi</div>
           <h2 className="section-title-large">BE Computer Engineering Curriculum Hub</h2>
@@ -680,8 +845,141 @@ export default function LandingPage({ onOpenAuth }) {
         </div>
       </section>
 
-      {/* 5. Interactive Academic Knowledge Matrix */}
-      <section id="graph" className="vanguard-section" style={{ background: 'rgba(12, 15, 22, 0.7)' }}>
+      {/* 5. Live Peer-Reviewed Research Archive Stream */}
+      <section id="research-stream" className="vanguard-section vanguard-reveal-on-scroll">
+        <div className="section-head-centered">
+          <div className="section-eyebrow">Scholarly Output</div>
+          <h2 className="section-title-large">Peer-Reviewed Research Repository</h2>
+          <p className="section-subtext-balanced">
+            Directly browse faculty preprints, student master theses, and IEEE/ACM DOI indexed publications.
+          </p>
+        </div>
+
+        <div className="vanguard-double-bezel max-w-5xl mx-auto">
+          <div className="double-bezel-inner">
+            {/* Filter Tabs */}
+            <div className="sim-toolbar" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <div className="sim-categories">
+                {['All', 'Computer Engineering', 'Machine Learning', 'Systems'].map((dep) => (
+                  <button
+                    key={dep}
+                    className={`sim-cat-btn ${activeResearchFilter === dep ? 'active' : ''}`}
+                    onClick={() => setActiveResearchFilter(dep)}
+                  >
+                    <FileText size={13} /> {dep}
+                  </button>
+                ))}
+              </div>
+              <div className="sim-count-badge">
+                <ShieldCheck size={13} color="var(--success)" />
+                <span>
+                  {liveResearchPapers.length > 0 ? `${liveResearchPapers.length} Published Theses` : 'Verified DOIs'}
+                </span>
+              </div>
+            </div>
+
+            {/* Research Papers Grid */}
+            <div className="research-stream-grid">
+              {loadingResearch ? (
+                <div style={{ padding: '36px', textAlign: 'center', gridColumn: '1 / -1', color: 'var(--text-muted)' }}>
+                  Loading university research archive...
+                </div>
+              ) : liveResearchPapers.length > 0 ? (
+                liveResearchPapers
+                  .filter((p) => activeResearchFilter === 'All' || (p.department && p.department.toLowerCase().includes(activeResearchFilter.toLowerCase())))
+                  .slice(0, 4)
+                  .map((paper) => (
+                    <div
+                      key={paper.id}
+                      className="research-stream-card spotlight-card"
+                      onClick={() => onOpenAuth('register')}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div className="research-card-meta">
+                        <span className="research-pill-dept">{paper.department || 'Computer Engineering'}</span>
+                        <span className="research-pill-doi">{paper.doi ? `DOI: ${paper.doi}` : 'Verified Preprint'}</span>
+                      </div>
+                      <h4 className="research-card-title">{paper.title}</h4>
+                      <p className="research-card-authors">By {paper.authors}</p>
+                      <p className="research-card-abstract">
+                        {paper.abstract ? `${paper.abstract.slice(0, 140)}...` : 'Comprehensive peer-reviewed university research publication.'}
+                      </p>
+                      <div className="research-card-footer">
+                        <span className="research-citation-count">
+                          <Activity size={12} color="var(--primary)" /> {paper.citations_count || 0} Citations
+                        </span>
+                        <span className="research-read-link">
+                          Read Paper <ArrowUpRight size={12} />
+                        </span>
+                      </div>
+                    </div>
+                  ))
+              ) : (
+                [
+                  {
+                    title: 'Attention Is All You Need: Transformer Architecture',
+                    authors: 'Ashish Vaswani, Noam Shazeer, Niki Parmar',
+                    dept: 'Machine Learning',
+                    doi: '10.48550/arXiv.1706.03762',
+                    citations: 94210,
+                    abstract: 'The dominant sequence transduction models are based on complex recurrent or convolutional neural networks. We propose the Transformer, based solely on attention mechanisms.'
+                  },
+                  {
+                    title: 'Spanner: Google’s Globally Distributed Database',
+                    authors: 'James C. Corbett, Jeffrey Dean, Michael Epstein',
+                    dept: 'Distributed Systems',
+                    doi: '10.1145/2491245',
+                    citations: 4120,
+                    abstract: 'Spanner is Google’s scalable, multi-version, globally-distributed, and synchronously-replicated database supporting externally-consistent distributed transactions.'
+                  },
+                  {
+                    title: 'In Search of an Understandable Consensus Algorithm (Raft)',
+                    authors: 'Diego Ongaro, John Ousterhout',
+                    dept: 'Systems Architecture',
+                    doi: 'USENIX ATC 14',
+                    citations: 5800,
+                    abstract: 'Raft is a consensus algorithm for managing a replicated log. It produces a result equivalent to Paxos and is as efficient, but its structure is much more understandable.'
+                  },
+                  {
+                    title: 'Cache-Oblivious Algorithms and Search Trees',
+                    authors: 'Matteo Frigo, Charles E. Leiserson, Harald Prokop',
+                    dept: 'Algorithmic Foundations',
+                    doi: 'IEEE FOCS 99',
+                    citations: 1890,
+                    abstract: 'A cache-oblivious algorithm executes without knowing the parameters of the memory hierarchy, yet achieves asymptotically optimal cache performance across all levels.'
+                  }
+                ].map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="research-stream-card spotlight-card"
+                    onClick={() => onOpenAuth('register')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <div className="research-card-meta">
+                      <span className="research-pill-dept">{item.dept}</span>
+                      <span className="research-pill-doi">{item.doi}</span>
+                    </div>
+                    <h4 className="research-card-title">{item.title}</h4>
+                    <p className="research-card-authors">By {item.authors}</p>
+                    <p className="research-card-abstract">{item.abstract}</p>
+                    <div className="research-card-footer">
+                      <span className="research-citation-count">
+                        <Activity size={12} color="var(--primary)" /> {item.citations.toLocaleString()} Citations
+                      </span>
+                      <span className="research-read-link">
+                        Cite Paper <ArrowUpRight size={12} />
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 6. Interactive Academic Knowledge Matrix */}
+      <section id="graph" className="vanguard-section vanguard-reveal-on-scroll" style={{ background: 'rgba(12, 15, 22, 0.7)' }}>
         <div className="section-head-centered">
           <div className="section-eyebrow">Semantic Subject Mesh</div>
           <h2 className="section-title-large">Interactive Academic Knowledge Matrix</h2>

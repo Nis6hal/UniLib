@@ -49,8 +49,10 @@ export const api = {
     return request(`/borrows${qs ? `?${qs}` : ''}`);
   },
   borrowBook: (data) => request('/borrows', { method: 'POST', body: data }),
-  returnBook: (id) => request(`/borrows/${id}/return`, { method: 'POST' }),
-  renewBorrow: (id) => request(`/borrows/${id}/renew`, { method: 'POST' }),
+  returnBook: (id, payload = {}) => request(`/borrows/${id}/return`, { method: 'POST', body: payload }),
+  renewBorrow: (id, payload = {}) => request(`/borrows/${id}/renew`, { method: 'POST', body: payload }),
+  approveRenewal: (id) => request(`/borrows/${id}/approve-renewal`, { method: 'POST' }),
+  rejectRenewal: (id, reason = '') => request(`/borrows/${id}/reject-renewal`, { method: 'POST', body: { reason } }),
 
   // ── Reservations ──
   getReservations: (params) => {

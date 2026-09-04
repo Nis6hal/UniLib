@@ -101,8 +101,15 @@ export default function Dashboard({ currentUser, onNavigate }) {
 
   const handleRenewMyLoan = async (id) => {
     try {
-      await api.renewBorrow(id);
-      addToast('Loan renewed for +14 days!', 'success');
+      const res = await api.renewBorrow(id, {
+        role: currentUser?.role,
+        operator_id: currentUser?.id
+      });
+      if (res.status === 'pending_approval') {
+        addToast(res.message || 'Renewal requested! A librarian will verify and approve your extension.', 'info');
+      } else {
+        addToast('Loan renewed for +14 days!', 'success');
+      }
       load();
     } catch (e) {
       addToast(e.message, 'error');
@@ -382,16 +389,24 @@ export default function Dashboard({ currentUser, onNavigate }) {
                             </span>
                           </td>
                           <td>
-                            <span className="badge badge-info">{l.renewals || 0} / 2 used</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span className="badge badge-info">{l.renewals || 0} / 2 used</span>
+                              {l.renewal_status === 'pending_approval' && (
+                                <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>
+                                  Pending Verification
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td style={{ textAlign: 'right' }}>
                             <button
                               className="secondary"
                               style={{ padding: '6px 12px', fontSize: '0.78rem' }}
                               onClick={() => handleRenewMyLoan(l.id)}
-                              disabled={l.renewals >= 2}
+                              disabled={l.renewals >= 2 || l.renewal_status === 'pending_approval'}
+                              title={l.renewal_status === 'pending_approval' ? 'Verification in progress' : ''}
                             >
-                              <RotateCw size={13} /> {l.renewals >= 2 ? 'Max Renewed' : 'Renew (+14 Days)'}
+                              <RotateCw size={13} /> {l.renewal_status === 'pending_approval' ? 'Pending Approval' : l.renewals >= 2 ? 'Max Renewed' : 'Renew (+14 Days)'}
                             </button>
                           </td>
                         </tr>
