@@ -116,9 +116,6 @@ export default function LandingPage({ onOpenAuth }) {
   const [loadingResearch, setLoadingResearch] = useState(false);
   const [readingProgress, setReadingProgress] = useState(0);
 
-  // Canvas ref for animated particle orbit & digital book spine
-  const canvasRef = useRef(null);
-
   // 1. Reading / Page Scroll Progress
   useEffect(() => {
     const handleScroll = () => {
@@ -151,94 +148,6 @@ export default function LandingPage({ onOpenAuth }) {
 
     return () => observer.disconnect();
   }, [liveResearchPapers]);
-
-  // 3. Dynamic Interactive Canvas Simulation (Particle Web & Orbiting Constellations)
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let animationFrameId;
-    let width = (canvas.width = canvas.offsetWidth || 340);
-    let height = (canvas.height = canvas.offsetHeight || 280);
-
-    const handleResize = () => {
-      if (!canvas) return;
-      width = canvas.width = canvas.offsetWidth || 340;
-      height = canvas.height = canvas.offsetHeight || 280;
-    };
-    window.addEventListener('resize', handleResize);
-
-    const particles = Array.from({ length: 32 }, () => ({
-      x: Math.random() * width,
-      y: Math.random() * height,
-      vx: (Math.random() - 0.5) * 0.7,
-      vy: (Math.random() - 0.5) * 0.7,
-      radius: Math.random() * 2 + 1,
-      color: Math.random() > 0.4 ? 'rgba(212, 175, 55, ' : 'rgba(56, 189, 248, '
-    }));
-
-    let angle = 0;
-
-    const render = () => {
-      ctx.clearRect(0, 0, width, height);
-      angle += 0.015;
-
-      // Draw subtle orbital rings
-      const cx = width / 2;
-      const cy = height / 2;
-
-      ctx.save();
-      ctx.strokeStyle = 'rgba(212, 175, 55, 0.15)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 6]);
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, 110, 50, angle * 0.5, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.12)';
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, 80, 36, -angle * 0.7, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-
-      // Draw floating particles with dynamic web linking
-      for (let i = 0; i < particles.length; i++) {
-        const p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-
-        if (p.x < 0 || p.x > width) p.vx *= -1;
-        if (p.y < 0 || p.y > height) p.vy *= -1;
-
-        ctx.fillStyle = p.color + '0.6)';
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fill();
-
-        for (let j = i + 1; j < particles.length; j++) {
-          const p2 = particles[j];
-          const dist = Math.hypot(p.x - p2.x, p.y - p2.y);
-          if (dist < 65) {
-            ctx.strokeStyle = `rgba(212, 175, 55, ${(1 - dist / 65) * 0.18})`;
-            ctx.lineWidth = 0.5;
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.stroke();
-          }
-        }
-      }
-
-      animationFrameId = requestAnimationFrame(render);
-    };
-
-    render();
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
 
   // Fetch Public Stats and Live Research on load
   useEffect(() => {
@@ -291,36 +200,6 @@ export default function LandingPage({ onOpenAuth }) {
       setCopiedText(true);
       setTimeout(() => setCopiedText(false), 2000);
     }
-  };
-
-  // Mouse position tracking for 3D Tilt & Spotlight Glow
-  const [tiltStyle, setTiltStyle] = useState({ transform: 'rotateX(0deg) rotateY(0deg)' });
-
-  const handleCardMouseMove = (e) => {
-    const card = e.currentTarget;
-    const rect = card.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    // Set CSS variables for radial spotlight
-    card.style.setProperty('--mouse-x', `${x}px`);
-    card.style.setProperty('--mouse-y', `${y}px`);
-
-    // Calculate 3D tilt
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const rotateX = ((y - centerY) / centerY) * -10;
-    const rotateY = ((x - centerX) / centerX) * 12;
-
-    setTiltStyle({
-      transform: `perspective(1000px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) scale3d(1.02, 1.02, 1.02)`
-    });
-  };
-
-  const handleCardMouseLeave = (e) => {
-    setTiltStyle({
-      transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)'
-    });
   };
 
   return (
@@ -454,70 +333,78 @@ export default function LandingPage({ onOpenAuth }) {
             </div>
           </div>
 
-          {/* Right Column: 3D Interactive Spotlight Tilt Card & Orbital Particle Canvas */}
-          <div className="hero-3d-stage vanguard-reveal-on-scroll">
-            <canvas ref={canvasRef} className="hero-orbital-canvas" />
-
-            <div
-              className="showcase-3d-card spotlight-card"
-              style={tiltStyle}
-              onMouseMove={handleCardMouseMove}
-              onMouseLeave={handleCardMouseLeave}
-            >
-              <div className="showcase-float-badge">
-                <ShieldCheck size={12} color="var(--success)" /> Verified Archival Grounding
-              </div>
-
-              {/* Floating Orbiting Micro-Badge */}
-              <div className="hero-orbit-pill orbit-pill-1">
-                <Sparkles size={11} color="var(--primary)" />
-                <span>RAG Grounded</span>
-              </div>
-
-              <div className="hero-orbit-pill orbit-pill-2">
-                <FileText size={11} color="#38bdf8" />
-                <span>DOI Indexed</span>
-              </div>
-
-              <div className="showcase-book-spine">
-                <div className="showcase-cover-art animated-book-cover">
-                  <div className="book-leaf-edge" />
-                  <span style={{ fontSize: '0.62rem', color: 'var(--primary)', fontWeight: 700, textTransform: 'uppercase' }}>Core Volume</span>
-                  <BookMarked size={24} color="#d4af37" />
-                  <span style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.6)' }}>CMP-310</span>
+          {/* Right Column: Sleek Glassmorphic Academic HUD Terminal */}
+          <div className="hero-hud-stage vanguard-reveal-on-scroll">
+            <div className="hero-hud-console">
+              {/* HUD Window Header */}
+              <div className="hud-console-header">
+                <div className="hud-window-controls">
+                  <span className="hud-dot hud-dot-close" />
+                  <span className="hud-dot hud-dot-min" />
+                  <span className="hud-dot hud-dot-max" />
                 </div>
-                <div className="showcase-book-meta">
-                  <span className="showcase-book-tag">Database Architecture</span>
-                  <h4 className="showcase-book-title">Database System Concepts</h4>
-                  <p className="showcase-book-author">by Avi Silberschatz & Henry Korth</p>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--success)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <CheckCircle2 size={12} /> 4 Copies Available on Shelf 3B
-                  </span>
+                <div className="hud-console-title">
+                  <Terminal size={13} color="var(--primary)" />
+                  <span>unilib-engine / arch-catalog</span>
+                </div>
+                <div className="hud-live-tag">
+                  <span className="hud-pulse-light" />
+                  <span>ONLINE</span>
                 </div>
               </div>
 
-              <div className="showcase-live-snippet">
-                <div className="snippet-header">
-                  <span>RAG Hybrid Synthesis Preview</span>
-                  <span style={{ color: 'var(--primary)', fontWeight: 600 }}>p. 42 CITED</span>
+              {/* Active Grounded Citation Card */}
+              <div className="hud-content-panel">
+                <div className="hud-book-row">
+                  <div className="hud-volume-badge">
+                    <BookMarked size={20} color="#d4af37" />
+                    <span>CMP-310</span>
+                  </div>
+                  <div className="hud-book-details">
+                    <div className="hud-category-chip">Core Archival Volume</div>
+                    <h4 className="hud-book-heading">Database System Concepts</h4>
+                    <p className="hud-book-byline">Avi Silberschatz, Henry F. Korth (6th Edition)</p>
+                  </div>
                 </div>
-                <p className="snippet-body">
-                  "BCNF requires every determinant to be a superkey, completely eliminating structural anomalies when overlapping composite candidate keys exist."
-                </p>
-              </div>
 
-              <div className="showcase-card-footer">
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <span className="badge badge-info" style={{ fontSize: '0.68rem' }}>PDF In-Browser</span>
-                  <span className="badge badge-primary" style={{ fontSize: '0.68rem' }}>AI Notes Hub</span>
+                <div className="hud-status-strip">
+                  <div className="hud-status-item">
+                    <CheckCircle2 size={13} color="var(--success)" />
+                    <span>4 Copies on Shelf 3B</span>
+                  </div>
+                  <div className="hud-divider-dot" />
+                  <div className="hud-status-item">
+                    <ShieldCheck size={13} color="#38bdf8" />
+                    <span>Verified Syllabi Grounding</span>
+                  </div>
                 </div>
-                <button
-                  className="btn"
-                  style={{ padding: '4px 12px', fontSize: '0.74rem' }}
-                  onClick={() => onOpenAuth('register')}
-                >
-                  Inspect Book <ArrowUpRight size={12} />
-                </button>
+
+                {/* Synthesis Output Terminal */}
+                <div className="hud-query-box">
+                  <div className="hud-query-head">
+                    <span className="hud-label">QUERY SYNTHESIS</span>
+                    <span className="hud-cite-tag">CITED p. 42</span>
+                  </div>
+                  <p className="hud-query-body">
+                    "BCNF strictly requires every non-trivial determinant to be a superkey, completely eliminating structural anomalies caused by overlapping composite candidate keys."
+                  </p>
+                </div>
+
+                {/* HUD Footer Actions & Telemetry */}
+                <div className="hud-console-footer">
+                  <div className="hud-tags-group">
+                    <span className="hud-tag">PDF In-Browser</span>
+                    <span className="hud-tag">Hybrid RAG</span>
+                    <span className="hud-tag">18ms Latency</span>
+                  </div>
+                  <button
+                    className="btn"
+                    style={{ padding: '6px 14px', fontSize: '0.78rem' }}
+                    onClick={() => onOpenAuth('register')}
+                  >
+                    Inspect Book <ArrowUpRight size={13} />
+                  </button>
+                </div>
               </div>
             </div>
           </div>

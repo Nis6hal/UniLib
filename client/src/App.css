@@ -2805,109 +2805,150 @@ p.success {
   transform: rotate(45deg);
 }
 
-/* 3D Interactive Showcase Card (Hero Right Column) */
-.hero-3d-stage {
-  perspective: 1400px;
+/* ==========================================================================
+   Sleek Glassmorphic Academic HUD Console (Hero Right Column)
+   ========================================================================== */
+
+.hero-hud-stage {
   display: flex;
   justify-content: center;
   align-items: center;
-  position: relative;
-}
-
-.showcase-3d-card {
-  position: relative;
   width: 100%;
-  max-width: 420px;
-  background: linear-gradient(135deg, rgba(20, 26, 38, 0.85) 0%, rgba(10, 13, 20, 0.95) 100%);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(212, 175, 55, 0.3);
-  border-radius: 24px;
-  padding: 28px;
-  box-shadow: 
-    0 24px 60px rgba(0, 0, 0, 0.8),
-    0 0 35px rgba(212, 175, 55, 0.15),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2);
-  transform-style: preserve-3d;
-  transition: transform 0.2s cubic-bezier(0.2, 0, 0.2, 1), box-shadow 0.3s ease;
 }
 
-.showcase-3d-card:hover {
-  border-color: rgba(212, 175, 55, 0.55);
+.hero-hud-console {
+  width: 100%;
+  max-width: 440px;
+  background: rgba(11, 15, 23, 0.78);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(212, 175, 55, 0.22);
+  border-radius: 20px;
+  overflow: hidden;
   box-shadow: 
-    0 32px 80px rgba(0, 0, 0, 0.9),
-    0 0 50px rgba(212, 175, 55, 0.28),
-    inset 0 1px 2px rgba(255, 255, 255, 0.3);
+    0 24px 60px rgba(0, 0, 0, 0.75),
+    0 0 30px rgba(212, 175, 55, 0.08),
+    inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Floating Badges pinned to 3D Card */
-.showcase-float-badge {
-  position: absolute;
-  top: -14px;
-  right: 20px;
+.hero-hud-console:hover {
+  border-color: rgba(212, 175, 55, 0.45);
+  box-shadow: 
+    0 30px 70px rgba(0, 0, 0, 0.85),
+    0 0 45px rgba(212, 175, 55, 0.16),
+    inset 0 1px 1px rgba(255, 255, 255, 0.25);
+  transform: translateY(-3px);
+}
+
+/* Console Top Bar */
+.hud-console-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: rgba(6, 9, 14, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hud-window-controls {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(16, 185, 129, 0.2) 100%);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(212, 175, 55, 0.4);
-  padding: 4px 14px;
-  border-radius: var(--radius-full);
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--primary);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
-  transform: translateZ(30px);
 }
 
-.showcase-book-spine {
+.hud-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.hud-dot-close { background: #f43f5e; opacity: 0.8; }
+.hud-dot-min { background: #f59e0b; opacity: 0.8; }
+.hud-dot-max { background: #10b981; opacity: 0.8; }
+
+.hud-console-title {
   display: flex;
-  gap: 16px;
-  margin-bottom: 20px;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
 }
 
-.showcase-cover-art {
-  width: 90px;
-  height: 125px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #1b2838 0%, #0d1520 100%);
-  border: 1px solid rgba(212, 175, 55, 0.3);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+.hud-live-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--success);
+  letter-spacing: 0.08em;
+}
+
+.hud-pulse-light {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 8px var(--success);
+  animation: pulseLive 2s infinite;
+}
+
+/* Content Panel */
+.hud-content-panel {
+  padding: 22px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  padding: 10px;
+  gap: 16px;
+}
+
+.hud-book-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.hud-volume-badge {
+  width: 48px;
+  height: 58px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(20, 26, 38, 0.9) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   flex-shrink: 0;
-  position: relative;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+
+.hud-volume-badge span {
+  font-size: 0.55rem;
+  font-family: var(--font-mono);
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.hud-book-details {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   overflow: hidden;
 }
 
-.showcase-cover-art::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 6px;
-  background: linear-gradient(90deg, rgba(255,255,255,0.2), transparent);
-}
-
-.showcase-book-meta {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-}
-
-.showcase-book-tag {
-  font-size: 0.7rem;
-  color: var(--primary);
+.hud-category-chip {
+  font-size: 0.65rem;
   font-weight: 700;
+  color: var(--primary);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
-.showcase-book-title {
+.hud-book-heading {
   font-family: var(--font-display);
   font-size: 1.15rem;
   font-weight: 700;
@@ -2916,42 +2957,102 @@ p.success {
   margin: 0;
 }
 
-.showcase-book-author {
-  font-size: 0.78rem;
+.hud-book-byline {
+  font-size: 0.76rem;
   color: var(--text-muted);
   margin: 0;
 }
 
-.showcase-live-snippet {
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 14px;
-  margin-bottom: 18px;
+/* Status Strip */
+.hud-status-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  font-size: 0.74rem;
 }
 
-.snippet-header {
+.hud-status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.hud-divider-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Synthesis Query Box */
+.hud-query-box {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(212, 175, 55, 0.15);
+  border-left: 3px solid var(--primary);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.hud-query-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
-.snippet-body {
+.hud-label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.hud-cite-tag {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--primary);
+  background: rgba(212, 175, 55, 0.12);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.hud-query-body {
   font-size: 0.8rem;
-  line-height: 1.55;
+  line-height: 1.5;
   color: var(--text-secondary);
   margin: 0;
 }
 
-.showcase-card-footer {
+/* Footer & Actions */
+.hud-console-footer {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding-top: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.hud-tags-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.hud-tag {
+  font-size: 0.66rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 /* Ambient Cursor Spotlight Glow */
@@ -3826,89 +3927,7 @@ p.success {
   transform: translateY(0);
 }
 
-/* 3. Hero Orbital Particle Canvas & Unfolding Book Dynamics */
-.hero-orbital-canvas {
-  position: absolute;
-  top: -40px;
-  left: -40px;
-  right: -40px;
-  bottom: -40px;
-  width: calc(100% + 80px);
-  height: calc(100% + 80px);
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.85;
-}
-
-.hero-orbit-pill {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(10, 14, 22, 0.88);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  padding: 4px 12px;
-  border-radius: var(--radius-full);
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: #fff;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-  z-index: 3;
-  pointer-events: none;
-}
-
-.orbit-pill-1 {
-  top: -12px;
-  left: 24px;
-  animation: floatOrbital1 4s ease-in-out infinite alternate;
-}
-
-.orbit-pill-2 {
-  bottom: -14px;
-  right: 28px;
-  animation: floatOrbital2 4.6s ease-in-out infinite alternate;
-}
-
-@keyframes floatOrbital1 {
-  0% { transform: translateY(0px) rotate(-1deg); }
-  100% { transform: translateY(-8px) rotate(2deg); }
-}
-
-@keyframes floatOrbital2 {
-  0% { transform: translateY(0px) rotate(1deg); }
-  100% { transform: translateY(6px) rotate(-2deg); }
-}
-
-/* Animated Book Cover & Pages */
-.animated-book-cover {
-  position: relative;
-  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.showcase-3d-card:hover .animated-book-cover {
-  transform: rotateY(-18deg) scale(1.05);
-}
-
-.book-leaf-edge {
-  position: absolute;
-  right: -3px;
-  top: 4px;
-  bottom: 4px;
-  width: 5px;
-  background: repeating-linear-gradient(
-    to bottom,
-    #fff,
-    #fff 1px,
-    #ddd 1px,
-    #ddd 2px
-  );
-  border-radius: 0 2px 2px 0;
-  box-shadow: 1px 0 3px rgba(0,0,0,0.5);
-  opacity: 0.8;
-}
-
-/* 4. Live Research Repository Stream Grid & Cards */
+/* 3. Live Research Repository Stream Grid & Cards */
 .research-stream-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
