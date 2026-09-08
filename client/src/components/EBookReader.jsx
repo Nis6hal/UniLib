@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../services/api';
 import { useToast } from './Toast';
 import Spinner from './Spinner';
@@ -116,6 +117,19 @@ export default function EBookReader({ currentUser, initialBook }) {
     document.addEventListener('fullscreenchange', handleFsChange);
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
+
+  // Auto-enter browser fullscreen whenever the reader opens
+  useEffect(() => {
+    if (activeReadingBook) {
+      // RAF ensures the portal has mounted and readerWindowRef is attached
+      const raf = requestAnimationFrame(() => {
+        if (readerWindowRef.current && !document.fullscreenElement) {
+          readerWindowRef.current.requestFullscreen().catch(() => {});
+        }
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [activeReadingBook]);
 
   // Compact paginated reading state
   const [bookContent, setBookContent] = useState(null);
@@ -497,6 +511,10 @@ export default function EBookReader({ currentUser, initialBook }) {
       saveProgress(activeReadingBook.id, currentPage, totalPages);
       // Refresh currently reading shelf
       setTimeout(() => loadCurrentlyReading(), 300);
+    }
+    // Exit browser fullscreen if active
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
     }
     setActiveReadingBook(null);
     setBookContent(null);
@@ -964,8 +982,8 @@ export default function EBookReader({ currentUser, initialBook }) {
         </div>
       )}
 
-      {/* In-Browser Document Reader Overlay */}
-      {activeReadingBook && (
+      {/* In-Browser Document Reader Overlay rendered in document.body via Portal to escape parent layout & transform */}
+      {activeReadingBook && createPortal(
         <div className="reader-overlay" onClick={closeReader}>
           <div
             ref={readerWindowRef}
@@ -1405,7 +1423,8 @@ export default function EBookReader({ currentUser, initialBook }) {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
