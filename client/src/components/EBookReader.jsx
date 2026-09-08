@@ -136,6 +136,7 @@ export default function EBookReader({ currentUser, initialBook }) {
   const [contentLoading, setContentLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const pdfTotalPagesRef = useRef(1);
   const [showToc, setShowToc] = useState(false);
   const [fontSize, setFontSize] = useState(16);
   const [jumpToPage, setJumpToPage] = useState('');
@@ -177,14 +178,14 @@ export default function EBookReader({ currentUser, initialBook }) {
         progress_pct: Math.round((page / total) * 100)
       });
     } catch (err) {
-      // Silently fail — not critical
+      addToast('Failed to save reading progress', 'error');
     }
-  }, [currentUser?.id]);
+  }, [currentUser?.id, addToast]);
 
   // Bridge PDF viewer progress back into UniLib (saves reading progress)
   const handlePdfProgress = useCallback((page, total) => {
     setCurrentPage(page);
-    setTotalPages(total);
+    pdfTotalPagesRef.current = total;
     if (activeReadingBook && currentUser?.id) {
       saveProgress(activeReadingBook.id, page, total);
     }
@@ -505,16 +506,14 @@ export default function EBookReader({ currentUser, initialBook }) {
     }
   };
 
-  const closeReader = () => {
-    // Save progress before closing
+  const closeReader = async () => {
     if (activeReadingBook && currentUser?.id) {
-      saveProgress(activeReadingBook.id, currentPage, totalPages);
-      // Refresh currently reading shelf
-      setTimeout(() => loadCurrentlyReading(), 300);
+      const total = readerViewMode === 'pdf' ? pdfTotalPagesRef.current : totalPages;
+      await saveProgress(activeReadingBook.id, currentPage, total);
+      await loadCurrentlyReading();
     }
-    // Exit browser fullscreen if active
     if (document.fullscreenElement && document.exitFullscreen) {
-      document.exitFullscreen().catch(() => {});
+      document.fullscreenElement && document.exitFullscreen().catch(() => {});
     }
     setActiveReadingBook(null);
     setBookContent(null);
@@ -555,7 +554,8 @@ export default function EBookReader({ currentUser, initialBook }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeReadingBook, readerViewMode, currentPage, totalPages, goToPage]);
 
-  const progressPct = totalPages > 0 ? Math.round((currentPage / totalPages) * 100) : 0;
+  const effectiveTotal = readerViewMode === 'pdf' ? pdfTotalPagesRef.current : totalPages;
+  const progressPct = effectiveTotal > 0 ? Math.round((currentPage / effectiveTotal) * 100) : 0;
 
   return (
     <div className="animate-in">

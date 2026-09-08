@@ -324,11 +324,11 @@ export default function PdfViewer({
     const observer = new IntersectionObserver(
       (entries) => {
         if (isJumping.current) return;
-        const visibleEntry = entries.find(
-          (entry) => entry.isIntersecting && entry.intersectionRatio > 0.5
-        );
-        if (visibleEntry) {
-          const pageNum = parseInt(visibleEntry.target.getAttribute("data-page"));
+        const visibleEntries = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+        if (visibleEntries[0]) {
+          const pageNum = parseInt(visibleEntries[0].target.getAttribute("data-page"));
           if (pageNum) {
             setCurrentPage((prev) => {
               if (prev !== pageNum) {
@@ -340,7 +340,7 @@ export default function PdfViewer({
           }
         }
       },
-      { threshold: [0.5, 0.7, 0.9] }
+      { threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5] }
     );
 
     const pageElements = containerRef.current.querySelectorAll(".pdf-page-item");
