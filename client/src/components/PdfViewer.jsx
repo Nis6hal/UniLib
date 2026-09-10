@@ -186,6 +186,16 @@ export default function PdfViewer({
     }
   }, [currentPage, totalPages, pdfDoc, onProgress]);
 
+  // Sync initialPage prop changes (e.g. when parent restores saved progress)
+  useEffect(() => {
+    if (!pdfDoc || totalPages === 0) return;
+    const clamped = Math.max(1, Math.min(totalPages, initialPage));
+    if (clamped !== currentPage) {
+      setCurrentPage(clamped);
+      setPageInput(clamped.toString());
+    }
+  }, [initialPage, pdfDoc, totalPages, currentPage]);
+
   const isJumping = useRef(false);
   const jumpTimeout = useRef(null);
 
